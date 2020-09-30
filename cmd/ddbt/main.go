@@ -35,25 +35,33 @@ const (
 )
 
 func main() {
-	config, err := newConfig()
-	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-
-	tableInfo, err := retrieveTableInformation(config)
-	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-
-	err = truncateTable(context.Background(), config, tableInfo)
+	err := run()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
 	os.Exit(0)
+}
+
+func run() error {
+	config, err := newConfig()
+	if err != nil {
+		return err
+	}
+
+	tableInfo, err := retrieveTableInformation(config)
+	if err != nil {
+		return err
+	}
+
+	err = truncateTable(context.Background(), config, tableInfo)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "Table %s successfully truncated", config.table)
+	return nil
 }
 
 type configuration struct {
