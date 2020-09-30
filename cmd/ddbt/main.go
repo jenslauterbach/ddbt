@@ -229,7 +229,7 @@ func newProjection(tableInfo *dynamodb.DescribeTableOutput) (*expression.Express
 	projection := expression.NamesList(expression.Name(*keys[0].AttributeName))
 
 	if len(keys) == 2 {
-		projection.AddNames(expression.Name(*keys[1].AttributeName))
+		projection = projection.AddNames(expression.Name(*keys[1].AttributeName))
 	}
 
 	expr, err := expression.NewBuilder().WithProjection(projection).Build()
