@@ -84,11 +84,7 @@ func newConfig() (configuration, error) {
 	awsConfig := &aws.Config{}
 	awsConfig.Region = region
 
-	if region != nil {
-		awsConfig.Region = region
-	}
-
-	if endpoint != nil {
+	if *endpoint != "" {
 		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 			return endpoints.ResolvedEndpoint{
 				URL:           *endpoint,
