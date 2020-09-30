@@ -82,6 +82,7 @@ func newConfig() (configuration, error) {
 	flag.Parse()
 
 	awsConfig := &aws.Config{}
+	awsConfig.Region = region
 
 	if region != nil {
 		awsConfig.Region = region
