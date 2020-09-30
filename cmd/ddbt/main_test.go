@@ -179,3 +179,90 @@ func createRandomUnprocessedItems(table string, count int) map[string][]*dynamod
 
 	return map[string][]*dynamodb.WriteRequest{table: items}
 }
+
+func Test_newProjection(t *testing.T) {
+	type args struct {
+		tableInfo *dynamodb.DescribeTableOutput
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "one-key",
+			args: args{
+				tableInfo: &dynamodb.DescribeTableOutput{
+					Table: &dynamodb.TableDescription{
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
+						},
+					},
+				},
+			},
+			want:    []string{"uuid"},
+			wantErr: false,
+		},
+		{
+			name: "two-keys",
+			args: args{
+				tableInfo: &dynamodb.DescribeTableOutput{
+					Table: &dynamodb.TableDescription{
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
+							{AttributeName: aws.String("created"), KeyType: aws.String("S")},
+						},
+					},
+				},
+			},
+			want:    []string{"uuid", "created"},
+			wantErr: false,
+		},
+		{
+			name: "err",
+			args: args{
+				tableInfo: &dynamodb.DescribeTableOutput{
+					Table: &dynamodb.TableDescription{
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String(""), KeyType: aws.String("")},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := newProjection(tt.args.tableInfo)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("newProjection() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// when an error is expected, no need for further tests.
+			if tt.wantErr {
+				return
+			}
+
+			if got == nil {
+				t.Errorf("newProject() returned nil")
+				return
+			}
+
+			for _, wantName := range tt.want {
+				ok := false
+				for _, gotName := range got.Names() {
+					if *gotName == wantName {
+						ok = true
+					}
+				}
+				if !ok {
+					t.Errorf("newProjection() does not contain key name '%s'", wantName)
+					return
+				}
+			}
+		})
+	}
+}
