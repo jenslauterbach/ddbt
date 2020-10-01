@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
@@ -32,6 +33,10 @@ const (
 	// backoffBase is the "base" used by the exponential backoff algorithm to determine when the next request should be
 	// send.
 	backoffBase = 1.5
+)
+
+var (
+	errTableMissing = errors.New("error: no table name provided")
 )
 
 func main() {
@@ -79,11 +84,15 @@ func newConfig(args []string) (configuration, error) {
 	var flags flag.FlagSet
 	flags.Init("flags", flag.ExitOnError)
 	region := flags.String("region", "", "AWS region to use")
-	table := flags.String("table-name", "", "name of the DynamoDB table to truncate")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	err := flags.Parse(args)
 	if err != nil {
 		return configuration{}, err
+	}
+
+	table := flags.Arg(0)
+	if table == "" {
+		return configuration{}, errTableMissing
 	}
 
 	awsConfig := &aws.Config{}
@@ -115,7 +124,7 @@ func newConfig(args []string) (configuration, error) {
 	db := dynamodb.New(sess)
 
 	return configuration{
-		table:      *table,
+		table:      table,
 		db:         db,
 		maxRetries: defaultMaxRetries,
 	}, nil
