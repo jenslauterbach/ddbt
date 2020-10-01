@@ -86,10 +86,14 @@ func newConfig() (configuration, error) {
 
 	if *endpoint != "" {
 		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-			return endpoints.ResolvedEndpoint{
-				URL:           *endpoint,
-				SigningRegion: region,
-			}, nil
+			if service == endpoints.DynamodbServiceID {
+				return endpoints.ResolvedEndpoint{
+					URL:           *endpoint,
+					SigningRegion: region,
+				}, nil
+			}
+
+			return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
 		}
 
 		awsConfig.EndpointResolver = endpoints.ResolverFunc(resolver)
