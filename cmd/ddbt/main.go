@@ -78,7 +78,7 @@ type configuration struct {
 func newConfig(args []string) (configuration, error) {
 	var flags flag.FlagSet
 	flags.Init("flags", flag.ExitOnError)
-	region := flags.String("region", "us-east-1", "AWS region to use")
+	region := flags.String("region", "", "AWS region to use")
 	table := flags.String("table-name", "", "name of the DynamoDB table to truncate")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	err := flags.Parse(args)
@@ -87,7 +87,10 @@ func newConfig(args []string) (configuration, error) {
 	}
 
 	awsConfig := &aws.Config{}
-	awsConfig.Region = region
+
+	if *region != "" {
+		awsConfig.Region = region
+	}
 
 	if *endpoint != "" {
 		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
