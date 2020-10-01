@@ -81,31 +81,67 @@ type configuration struct {
 }
 
 func newConfig(args []string) (configuration, error) {
-	var flags flag.FlagSet
-	flags.Init("flags", flag.ExitOnError)
-	region := flags.String("region", "", "AWS region to use")
-	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
-	err := flags.Parse(args)
+	parsedArguments, err := parseArguments(args)
 	if err != nil {
 		return configuration{}, err
 	}
 
-	table := flags.Arg(0)
-	if table == "" {
+	if parsedArguments.table == "" {
 		return configuration{}, errTableMissing
 	}
 
-	awsConfig := &aws.Config{}
-
-	if *region != "" {
-		awsConfig.Region = region
+	awsConfig := newAwsConfig(parsedArguments)
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
 	}
 
-	if *endpoint != "" {
+	return configuration{
+		table:      parsedArguments.table,
+		db:         dynamodb.New(sess),
+		maxRetries: defaultMaxRetries,
+	}, nil
+}
+
+type arguments struct {
+	region   string
+	endpoint string
+	table    string
+}
+
+func parseArguments(args []string) (arguments, error) {
+	var flags flag.FlagSet
+	flags.Init("flags", flag.ExitOnError)
+
+	region := flags.String("region", "", "AWS region to use")
+	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
+
+	err := flags.Parse(args)
+	if err != nil {
+		return arguments{}, err
+	}
+
+	table := flags.Arg(0)
+
+	return arguments{
+		region:   *region,
+		endpoint: *endpoint,
+		table:    table,
+	}, nil
+}
+
+func newAwsConfig(args arguments) *aws.Config {
+	config := &aws.Config{}
+
+	if args.region != "" {
+		config.Region = &args.region
+	}
+
+	if args.endpoint != "" {
 		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 			if service == endpoints.DynamodbServiceID {
 				return endpoints.ResolvedEndpoint{
-					URL:           *endpoint,
+					URL:           args.endpoint,
 					SigningRegion: region,
 				}, nil
 			}
@@ -113,21 +149,10 @@ func newConfig(args []string) (configuration, error) {
 			return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
 		}
 
-		awsConfig.EndpointResolver = endpoints.ResolverFunc(resolver)
+		config.EndpointResolver = endpoints.ResolverFunc(resolver)
 	}
 
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
-	}
-
-	db := dynamodb.New(sess)
-
-	return configuration{
-		table:      table,
-		db:         db,
-		maxRetries: defaultMaxRetries,
-	}, nil
+	return config
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
