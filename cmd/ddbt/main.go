@@ -176,7 +176,7 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 		total := segments
 		current := segment
 		g.Go(func() error {
-			return processSegment(config, tableInfo, total, current, ctx, g)
+			return processSegment(ctx, config, tableInfo, total, current, g)
 		})
 	}
 
@@ -188,7 +188,7 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 	return nil
 }
 
-func processSegment(config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, ctx context.Context, g *errgroup.Group) error {
+func processSegment(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, g *errgroup.Group) error {
 	expr, err := newProjection(tableInfo)
 	if err != nil {
 		return err
