@@ -215,6 +215,24 @@ func processSegment(config configuration, tableInfo *dynamodb.DescribeTableOutpu
 	return nil
 }
 
+func newProjection(tableInfo *dynamodb.DescribeTableOutput) (*expression.Expression, error) {
+	// There is at least one key in the table. This one will be added by default. If there is a second key, it is added
+	// to the projection as well.
+	keys := tableInfo.Table.KeySchema
+	projection := expression.NamesList(expression.Name(*keys[0].AttributeName))
+
+	if len(keys) == 2 {
+		projection = projection.AddNames(expression.Name(*keys[1].AttributeName))
+	}
+
+	expr, err := expression.NewBuilder().WithProjection(projection).Build()
+	if err != nil {
+		return nil, err
+	}
+
+	return &expr, nil
+}
+
 func processPage(ctx context.Context, config configuration, page *dynamodb.ScanOutput) error {
 	var total = *page.Count
 	var from int64
@@ -271,22 +289,4 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 	}
 
 	return nil
-}
-
-func newProjection(tableInfo *dynamodb.DescribeTableOutput) (*expression.Expression, error) {
-	// There is at least one key in the table. This one will be added by default. If there is a second key, it is added
-	// to the projection as well.
-	keys := tableInfo.Table.KeySchema
-	projection := expression.NamesList(expression.Name(*keys[0].AttributeName))
-
-	if len(keys) == 2 {
-		projection = projection.AddNames(expression.Name(*keys[1].AttributeName))
-	}
-
-	expr, err := expression.NewBuilder().WithProjection(projection).Build()
-	if err != nil {
-		return nil, err
-	}
-
-	return &expr, nil
 }
