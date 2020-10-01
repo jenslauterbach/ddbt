@@ -35,7 +35,7 @@ const (
 )
 
 func main() {
-	err := run()
+	err := run(os.Args[1:])
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
@@ -44,8 +44,8 @@ func main() {
 	os.Exit(0)
 }
 
-func run() error {
-	config, err := newConfig()
+func run(args []string) error {
+	config, err := newConfig(args)
 	if err != nil {
 		return err
 	}
@@ -75,11 +75,16 @@ type configuration struct {
 	maxRetries int
 }
 
-func newConfig() (configuration, error) {
-	region := flag.String("region", "us-east-1", "AWS region to use")
-	table := flag.String("table-name", "", "name of the DynamoDB table to truncate")
-	endpoint := flag.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
-	flag.Parse()
+func newConfig(args []string) (configuration, error) {
+	var flags flag.FlagSet
+	flags.Init("flags", flag.ExitOnError)
+	region := flags.String("region", "us-east-1", "AWS region to use")
+	table := flags.String("table-name", "", "name of the DynamoDB table to truncate")
+	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
+	err := flags.Parse(args)
+	if err != nil {
+		return configuration{}, err
+	}
 
 	awsConfig := &aws.Config{}
 	awsConfig.Region = region
