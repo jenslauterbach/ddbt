@@ -5,6 +5,7 @@ import (
 	"ddbt/internal"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
@@ -260,6 +261,81 @@ func Test_newProjection(t *testing.T) {
 				}
 				if !ok {
 					t.Errorf("newProjection() does not contain key name '%s'", wantName)
+					return
+				}
+			}
+		})
+	}
+}
+
+func Test_newConfig(t *testing.T) {
+	type args struct {
+		args []string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		wantTable    string
+		wantRegion   string
+		wantEndpoint string
+		wantErr      bool
+	}{
+		{
+			name:       "region-set",
+			args:       args{args: []string{"--region", "test-region", "TestTable"}},
+			wantRegion: "test-region",
+			wantErr:    false,
+		},
+		{
+			name:         "endpoint-set",
+			args:         args{args: []string{"--endpoint-url", "http://localhost:8000", "TestTable"}},
+			wantEndpoint: "http://localhost:8000",
+			wantErr:      false,
+		},
+		{
+			name:    "no-table",
+			args:    args{args: []string{}},
+			wantErr: true,
+		},
+		{
+			name:      "table-set",
+			args:      args{args: []string{"TestTable"}},
+			wantTable: "TestTable",
+			wantErr:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := newConfig(tt.args.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("newConfig() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantRegion != "" {
+				gotRegion := *got.db.(*dynamodb.DynamoDB).Config.Region
+				if gotRegion != tt.wantRegion {
+					t.Errorf("newConfig() region = %s, wantRegion = %s", gotRegion, tt.wantRegion)
+					return
+				}
+			}
+
+			if tt.wantTable != "" {
+				if got.table != tt.wantTable {
+					t.Errorf("newConfig() table = %s, wantTable = %s", got.table, tt.wantTable)
+					return
+				}
+			}
+
+			if tt.wantEndpoint != "" {
+				gotEndpoint, err := got.db.(*dynamodb.DynamoDB).Config.EndpointResolver.EndpointFor(endpoints.DynamodbServiceID, "us-east-1")
+				if err != nil {
+					t.Errorf("newConfig() endpoint = err: %s", err.Error())
+					return
+				}
+
+				if gotEndpoint.URL != tt.wantEndpoint {
+					t.Errorf("newConfig() endpoint = %s, wantEndpoint = %s", gotEndpoint.URL, tt.wantEndpoint)
 					return
 				}
 			}
