@@ -36,6 +36,8 @@ const (
 	// send.
 	backoffBase = 1.5
 
+	// usage is the message that is displayed when the user explicitly uses the --help flag or when there is an error
+	// and the user is to be informed about proper usage of ddbt.
 	usage = `Usage: ddbt [options...] <table-name>
 
 Options:
@@ -48,6 +50,7 @@ Options:
 )
 
 var (
+	// commandVersion is the version of the ddbt tool, which is set at build time using ldflags
 	commandVersion  = "development"
 	errTableMissing = errors.New("no table name provided")
 )
