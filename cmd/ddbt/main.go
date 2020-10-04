@@ -107,43 +107,6 @@ func run(args []string) error {
 	return nil
 }
 
-type configuration struct {
-	// table is the name of the DynamoDB table to be truncated
-	table string
-
-	// db is the client used to interact with DynamoDB
-	db dynamodbiface.DynamoDBAPI
-
-	// maxRetries is the number of times a failed network request is retried
-	maxRetries uint
-
-	// log is used to output debug information
-	logger *log.Logger
-
-	dryRun bool
-}
-
-func newConfig(args arguments) (configuration, error) {
-	awsConfig := newAwsConfig(args)
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
-	}
-
-	var logOutput = ioutil.Discard
-	if args.debug {
-		logOutput = os.Stdout
-	}
-
-	return configuration{
-		table:      args.table,
-		db:         dynamodb.New(sess),
-		maxRetries: args.retries,
-		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
-		dryRun:     args.dryRun,
-	}, nil
-}
-
 type arguments struct {
 	region   string
 	endpoint string
@@ -180,6 +143,43 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		help:     *help,
 		version:  *version,
 		dryRun:   *dry,
+	}, nil
+}
+
+type configuration struct {
+	// table is the name of the DynamoDB table to be truncated
+	table string
+
+	// db is the client used to interact with DynamoDB
+	db dynamodbiface.DynamoDBAPI
+
+	// maxRetries is the number of times a failed network request is retried
+	maxRetries uint
+
+	// log is used to output debug information
+	logger *log.Logger
+
+	dryRun bool
+}
+
+func newConfig(args arguments) (configuration, error) {
+	awsConfig := newAwsConfig(args)
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
+	}
+
+	var logOutput = ioutil.Discard
+	if args.debug {
+		logOutput = os.Stdout
+	}
+
+	return configuration{
+		table:      args.table,
+		db:         dynamodb.New(sess),
+		maxRetries: args.retries,
+		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		dryRun:     args.dryRun,
 	}, nil
 }
 
