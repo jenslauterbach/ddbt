@@ -16,6 +16,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -104,7 +105,7 @@ func run(args []string) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "Table %s successfully truncated", config.table)
+	_, _ = fmt.Fprintf(os.Stdout, "Truncated %d items from table %s\n", config.stats.deleted, config.table)
 	return nil
 }
 
@@ -158,7 +159,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 
 func isInputFromPipe() bool {
 	fileInfo, _ := os.Stdin.Stat()
-	return fileInfo.Mode() & os.ModeCharDevice == 0
+	return fileInfo.Mode()&os.ModeCharDevice == 0
 }
 
 type configuration struct {
@@ -175,6 +176,22 @@ type configuration struct {
 	logger *log.Logger
 
 	dryRun bool
+
+	// stats keeps track of deleted of important statistics related to the process of truncating the table, like number
+	// of deleted or failed items or how much capacity was consumed.
+	stats *statistics
+}
+
+type statistics struct {
+	mu sync.Mutex
+	// deleted number of items
+	deleted uint64
+}
+
+func (s *statistics) increaseDeleted(n uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deleted += n
 }
 
 func newConfig(args arguments) (configuration, error) {
@@ -195,6 +212,7 @@ func newConfig(args arguments) (configuration, error) {
 		maxRetries: args.retries,
 		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
 		dryRun:     args.dryRun,
+		stats:      &statistics{},
 	}, nil
 }
 
@@ -336,7 +354,10 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 }
 
 func deleteBatch(ctx context.Context, config configuration, items []map[string]*dynamodb.AttributeValue) error {
-	requests := make([]*dynamodb.WriteRequest, len(items))
+	bSize := len(items)
+	processed := 0
+
+	requests := make([]*dynamodb.WriteRequest, bSize)
 
 	for index, key := range items {
 		requests[index] = &dynamodb.WriteRequest{
@@ -369,6 +390,10 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 		}
 
 		unprocessed = output.UnprocessedItems
+
+		processed = bSize - processed - len(unprocessed)
+		config.stats.increaseDeleted(uint64(processed))
+
 		retry++
 	}
 
