@@ -83,6 +83,10 @@ func run(args []string) error {
 		return errTableMissing
 	}
 
+	if parsedArguments.dryRun {
+		fmt.Fprintf(os.Stdout, "Performing dry run\n")
+	}
+
 	config, err := newConfig(parsedArguments)
 	if err != nil {
 		return err
@@ -114,6 +118,8 @@ type configuration struct {
 
 	// log is used to output debug information
 	logger *log.Logger
+
+	dryRun bool
 }
 
 func newConfig(args arguments) (configuration, error) {
@@ -133,6 +139,7 @@ func newConfig(args arguments) (configuration, error) {
 		db:         dynamodb.New(sess),
 		maxRetries: args.retries,
 		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		dryRun:     args.dryRun,
 	}, nil
 }
 
@@ -144,6 +151,7 @@ type arguments struct {
 	debug    bool
 	help     bool
 	version  bool
+	dryRun   bool
 }
 
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
@@ -153,6 +161,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	debug := flags.Bool("debug", false, "show debug information")
 	help := flags.Bool("help", false, "show help text")
 	version := flags.Bool("version", false, "show version")
+	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -169,6 +178,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		debug:    *debug,
 		help:     *help,
 		version:  *version,
+		dryRun:   *dry,
 	}, nil
 }
 
@@ -294,6 +304,10 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 		to += batchSize
 		if to > total {
 			to = total
+		}
+
+		if config.dryRun {
+			continue
 		}
 
 		err := deleteBatch(ctx, config, page.Items[from:to])
