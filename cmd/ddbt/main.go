@@ -33,6 +33,13 @@ const (
 	// backoffBase is the "base" used by the exponential backoff algorithm to determine when the next request should be
 	// send.
 	backoffBase = 1.5
+
+	usage = `Usage: ddbt [options...] <table-name>
+
+Options:
+  --region region of DynamoDB table (overwrite default region)
+  --endpoint-url custom endpoint url (overwrite default endpoint)
+`
 )
 
 var (
@@ -42,7 +49,7 @@ var (
 func main() {
 	err := run(os.Args[1:])
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "error: %s\n\n%s", err.Error(), usage)
 		os.Exit(1)
 	}
 
