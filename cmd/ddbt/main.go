@@ -226,7 +226,7 @@ func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutp
 }
 
 func truncateTable(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput) error {
-	fmt.Fprintf(os.Stdout, "Truncating table %s\n", * tableInfo.Table.TableArn)
+	fmt.Fprintf(os.Stdout, "Truncating table %s\n", *tableInfo.Table.TableArn)
 
 	g, ctx := errgroup.WithContext(ctx)
 
