@@ -39,20 +39,23 @@ const (
 	usage = `Usage: ddbt [options...] <table-name>
 
 Options:
-  --region AWS region of DynamoDB table (overwrite default region)
-  --endpoint-url custom endpoint url (overwrite default endpoint)
-  --max-retries maximum number of retries (default: 10)
+  --region		AWS region of DynamoDB table (overwrite default region)
+  --endpoint-url	Custom endpoint url (overwrite default endpoint)
+  --max-retries		Maximum number of retries (default: 10)
+  --help		This help text
+  --version		Show version number and quit
 `
 )
 
 var (
+	commandVersion  = "development"
 	errTableMissing = errors.New("no table name provided")
 )
 
 func main() {
 	err := run(os.Args[1:])
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "error: %s\n\n%s", err.Error(), usage)
+		fmt.Fprintf(os.Stderr, "error: %s\n\n%s", err.Error(), usage)
 		os.Exit(1)
 	}
 
@@ -60,7 +63,22 @@ func main() {
 }
 
 func run(args []string) error {
-	config, err := newConfig(args)
+	parsedArguments, err := parseArguments(args)
+	if err != nil {
+		return err
+	}
+
+	if parsedArguments.help {
+		fmt.Fprintf(os.Stdout, "%s", usage)
+		return nil
+	}
+
+	if parsedArguments.version {
+		fmt.Fprintf(os.Stdout, "ddbt %s\n", commandVersion)
+		return nil
+	}
+
+	config, err := newConfig(parsedArguments)
 	if err != nil {
 		return err
 	}
@@ -93,31 +111,26 @@ type configuration struct {
 	logger *log.Logger
 }
 
-func newConfig(args []string) (configuration, error) {
-	parsedArguments, err := parseArguments(args)
-	if err != nil {
-		return configuration{}, err
-	}
-
-	if parsedArguments.table == "" {
+func newConfig(args arguments) (configuration, error) {
+	if args.table == "" {
 		return configuration{}, errTableMissing
 	}
 
-	awsConfig := newAwsConfig(parsedArguments)
+	awsConfig := newAwsConfig(args)
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
 		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
 	}
 
 	var logOutput = ioutil.Discard
-	if parsedArguments.debug {
+	if args.debug {
 		logOutput = os.Stdout
 	}
 
 	return configuration{
-		table:      parsedArguments.table,
+		table:      args.table,
 		db:         dynamodb.New(sess),
-		maxRetries: parsedArguments.retries,
+		maxRetries: args.retries,
 		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
 	}, nil
 }
@@ -128,6 +141,8 @@ type arguments struct {
 	table    string
 	retries  uint
 	debug    bool
+	help     bool
+	version  bool
 }
 
 func parseArguments(args []string) (arguments, error) {
@@ -138,6 +153,8 @@ func parseArguments(args []string) (arguments, error) {
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	retries := flags.Uint("max-retries", defaultMaxRetries, "maximum number of retries (default: 10)")
 	debug := flags.Bool("debug", false, "show debug information")
+	help := flags.Bool("help", false, "show help text")
+	version := flags.Bool("version", false, "show version")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -152,6 +169,8 @@ func parseArguments(args []string) (arguments, error) {
 		table:    table,
 		retries:  *retries,
 		debug:    *debug,
+		help:     *help,
+		version:  *version,
 	}, nil
 }
 
