@@ -44,6 +44,7 @@ Options:
   --region		AWS region of DynamoDB table (overwrite default region)
   --endpoint-url	Custom endpoint url (overwrite default endpoint)
   --max-retries		Maximum number of retries (default: 10)
+  --dry-run		Simulate truncating table
   --help		This help text
   --version		Show version number and quit
 `
