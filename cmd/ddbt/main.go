@@ -43,7 +43,7 @@ Options:
 )
 
 var (
-	errTableMissing = errors.New("error: no table name provided")
+	errTableMissing = errors.New("no table name provided")
 )
 
 func main() {
