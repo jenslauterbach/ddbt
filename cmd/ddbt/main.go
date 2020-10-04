@@ -37,8 +37,9 @@ const (
 	usage = `Usage: ddbt [options...] <table-name>
 
 Options:
-  --region region of DynamoDB table (overwrite default region)
+  --region AWS region of DynamoDB table (overwrite default region)
   --endpoint-url custom endpoint url (overwrite default endpoint)
+  --max-retries maximum number of retries (default: 10)
 `
 )
 
@@ -84,7 +85,7 @@ type configuration struct {
 	db dynamodbiface.DynamoDBAPI
 
 	// maxRetries is the number of times a failed network request is retried
-	maxRetries int
+	maxRetries uint
 }
 
 func newConfig(args []string) (configuration, error) {
@@ -106,7 +107,7 @@ func newConfig(args []string) (configuration, error) {
 	return configuration{
 		table:      parsedArguments.table,
 		db:         dynamodb.New(sess),
-		maxRetries: defaultMaxRetries,
+		maxRetries: parsedArguments.retries,
 	}, nil
 }
 
@@ -114,6 +115,7 @@ type arguments struct {
 	region   string
 	endpoint string
 	table    string
+	retries  uint
 }
 
 func parseArguments(args []string) (arguments, error) {
@@ -122,6 +124,7 @@ func parseArguments(args []string) (arguments, error) {
 
 	region := flags.String("region", "", "AWS region to use")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
+	retries := flags.Uint("max-retries", defaultMaxRetries, "maximum number of retries (default: 10)")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -134,6 +137,7 @@ func parseArguments(args []string) (arguments, error) {
 		region:   *region,
 		endpoint: *endpoint,
 		table:    table,
+		retries:  *retries,
 	}, nil
 }
 
@@ -270,7 +274,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 		}
 	}
 
-	retry := 0
+	retry := uint(0)
 	unprocessed := map[string][]*dynamodb.WriteRequest{config.table: requests}
 	for ok := true; ok; ok = len(unprocessed) > 0 {
 		if retry > config.maxRetries {
