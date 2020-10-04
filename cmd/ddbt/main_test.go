@@ -279,26 +279,15 @@ func Test_newConfig(t *testing.T) {
 	}{
 		{
 			name:       "region-set",
-			args:       args{args: arguments{region: "test-region", table: "TestTable"}},
+			args:       args{args: arguments{region: "test-region"}},
 			wantRegion: "test-region",
 			wantErr:    false,
 		},
 		{
 			name:         "endpoint-set",
-			args:         args{args: arguments{endpoint: "http://localhost:8000", table: "TestTable"}},
+			args:         args{args: arguments{endpoint: "http://localhost:8000"}},
 			wantEndpoint: "http://localhost:8000",
 			wantErr:      false,
-		},
-		{
-			name:    "no-table",
-			args:    args{args: arguments{}},
-			wantErr: true,
-		},
-		{
-			name:      "table-set",
-			args:      args{args: arguments{table: "TestTable"}},
-			wantTable: "TestTable",
-			wantErr:   false,
 		},
 	}
 	for _, tt := range tests {

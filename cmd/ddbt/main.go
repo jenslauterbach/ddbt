@@ -81,6 +81,10 @@ func run(args []string) error {
 		return nil
 	}
 
+	if parsedArguments.table == "" {
+		return errTableMissing
+	}
+
 	config, err := newConfig(parsedArguments)
 	if err != nil {
 		return err
@@ -115,10 +119,6 @@ type configuration struct {
 }
 
 func newConfig(args arguments) (configuration, error) {
-	if args.table == "" {
-		return configuration{}, errTableMissing
-	}
-
 	awsConfig := newAwsConfig(args)
 	sess, err := session.NewSession(awsConfig)
 	if err != nil {
