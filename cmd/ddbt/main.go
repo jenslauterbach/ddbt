@@ -66,7 +66,7 @@ func main() {
 }
 
 func run(args []string) error {
-	parsedArguments, err := parseArguments(args)
+	parsedArguments, err := parseArguments(flag.CommandLine, args)
 	if err != nil {
 		return err
 	}
@@ -148,10 +148,7 @@ type arguments struct {
 	version  bool
 }
 
-func parseArguments(args []string) (arguments, error) {
-	var flags flag.FlagSet
-	flags.Init("flags", flag.ExitOnError)
-
+func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	region := flags.String("region", "", "AWS region to use")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	retries := flags.Uint("max-retries", defaultMaxRetries, "maximum number of retries (default: 10)")
