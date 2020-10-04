@@ -224,7 +224,7 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 func processSegment(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, g *errgroup.Group) error {
 	config.logger.Printf("start processing segment %d\n", segment)
 
-	expr, err := newProjection(tableInfo)
+	expr, err := newProjection(tableInfo.Table.KeySchema)
 	if err != nil {
 		return err
 	}
@@ -252,10 +252,9 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 	return nil
 }
 
-func newProjection(tableInfo *dynamodb.DescribeTableOutput) (*expression.Expression, error) {
+func newProjection(keys []*dynamodb.KeySchemaElement) (*expression.Expression, error) {
 	// There is at least one key in the table. This one will be added by default. If there is a second key, it is added
 	// to the projection as well.
-	keys := tableInfo.Table.KeySchema
 	projection := expression.NamesList(expression.Name(*keys[0].AttributeName))
 
 	if len(keys) == 2 {

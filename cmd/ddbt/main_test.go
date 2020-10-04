@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"io/ioutil"
+	"log"
 	"testing"
 )
 
@@ -16,6 +18,8 @@ const (
 	hashKeyName = "uuid"
 	tableName   = "TestTable"
 )
+
+var testLogger = log.New(ioutil.Discard, "", 0)
 
 type batchWriteItemWithContextMock struct {
 	dynamodbiface.DynamoDBAPI
@@ -58,6 +62,7 @@ func Test_deleteBatch(t *testing.T) {
 					},
 					table:      tableName,
 					maxRetries: 10,
+					logger:     testLogger,
 				},
 			},
 			wantErr:       false,
@@ -76,6 +81,7 @@ func Test_deleteBatch(t *testing.T) {
 					},
 					table:      tableName,
 					maxRetries: 10,
+					logger:     testLogger,
 				},
 			},
 			wantErr:       false,
@@ -95,6 +101,7 @@ func Test_deleteBatch(t *testing.T) {
 					},
 					table:      tableName,
 					maxRetries: 10,
+					logger:     testLogger,
 				},
 			},
 			wantErr:       false,
@@ -115,6 +122,7 @@ func Test_deleteBatch(t *testing.T) {
 					},
 					table:      tableName,
 					maxRetries: 1,
+					logger:     testLogger,
 				},
 			},
 			wantErr:       false,
@@ -131,6 +139,7 @@ func Test_deleteBatch(t *testing.T) {
 					},
 					table:      tableName,
 					maxRetries: 1,
+					logger:     testLogger,
 				},
 			},
 			wantErr:       true,
@@ -183,7 +192,7 @@ func createRandomUnprocessedItems(table string, count int) map[string][]*dynamod
 
 func Test_newProjection(t *testing.T) {
 	type args struct {
-		tableInfo *dynamodb.DescribeTableOutput
+		keys []*dynamodb.KeySchemaElement
 	}
 	tests := []struct {
 		name    string
@@ -194,12 +203,8 @@ func Test_newProjection(t *testing.T) {
 		{
 			name: "one-key",
 			args: args{
-				tableInfo: &dynamodb.DescribeTableOutput{
-					Table: &dynamodb.TableDescription{
-						KeySchema: []*dynamodb.KeySchemaElement{
-							{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
-						},
-					},
+				keys: []*dynamodb.KeySchemaElement{
+					{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
 				},
 			},
 			want:    []string{"uuid"},
@@ -208,13 +213,9 @@ func Test_newProjection(t *testing.T) {
 		{
 			name: "two-keys",
 			args: args{
-				tableInfo: &dynamodb.DescribeTableOutput{
-					Table: &dynamodb.TableDescription{
-						KeySchema: []*dynamodb.KeySchemaElement{
-							{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
-							{AttributeName: aws.String("created"), KeyType: aws.String("S")},
-						},
-					},
+				keys: []*dynamodb.KeySchemaElement{
+					{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
+					{AttributeName: aws.String("created"), KeyType: aws.String("S")},
 				},
 			},
 			want:    []string{"uuid", "created"},
@@ -223,12 +224,8 @@ func Test_newProjection(t *testing.T) {
 		{
 			name: "err",
 			args: args{
-				tableInfo: &dynamodb.DescribeTableOutput{
-					Table: &dynamodb.TableDescription{
-						KeySchema: []*dynamodb.KeySchemaElement{
-							{AttributeName: aws.String(""), KeyType: aws.String("")},
-						},
-					},
+				keys: []*dynamodb.KeySchemaElement{
+					{AttributeName: aws.String(""), KeyType: aws.String("")},
 				},
 			},
 			wantErr: true,
@@ -236,7 +233,7 @@ func Test_newProjection(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := newProjection(tt.args.tableInfo)
+			got, err := newProjection(tt.args.keys)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("newProjection() error = %v, wantErr %v", err, tt.wantErr)
 				return
