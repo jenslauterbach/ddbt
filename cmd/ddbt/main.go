@@ -61,8 +61,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %s\n\n%s", err.Error(), usage)
 		os.Exit(1)
 	}
-
-	os.Exit(0)
 }
 
 func run(args []string) error {
