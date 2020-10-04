@@ -54,6 +54,7 @@ var (
 	// commandVersion is the version of the ddbt tool, which is set at build time using ldflags
 	commandVersion  = "development"
 	errTableMissing = errors.New("no table name provided")
+	errReadPipe     = errors.New("unable to read table name from pipe (stdin)")
 )
 
 func main() {
@@ -132,7 +133,16 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		return arguments{}, err
 	}
 
-	table := flags.Arg(0)
+	var table string
+	if isInputFromPipe() {
+		b, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return arguments{}, errReadPipe
+		}
+		table = string(b)
+	} else {
+		table = flags.Arg(0)
+	}
 
 	return arguments{
 		region:   *region,
@@ -144,6 +154,11 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		version:  *version,
 		dryRun:   *dry,
 	}, nil
+}
+
+func isInputFromPipe() bool {
+	fileInfo, _ := os.Stdin.Stat()
+	return fileInfo.Mode() & os.ModeCharDevice == 0
 }
 
 type configuration struct {
