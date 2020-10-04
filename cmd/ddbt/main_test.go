@@ -267,7 +267,7 @@ func Test_newProjection(t *testing.T) {
 
 func Test_newConfig(t *testing.T) {
 	type args struct {
-		args []string
+		args arguments
 	}
 	tests := []struct {
 		name         string
@@ -279,24 +279,24 @@ func Test_newConfig(t *testing.T) {
 	}{
 		{
 			name:       "region-set",
-			args:       args{args: []string{"--region", "test-region", "TestTable"}},
+			args:       args{args: arguments{region: "test-region", table: "TestTable"}},
 			wantRegion: "test-region",
 			wantErr:    false,
 		},
 		{
 			name:         "endpoint-set",
-			args:         args{args: []string{"--endpoint-url", "http://localhost:8000", "TestTable"}},
+			args:         args{args: arguments{endpoint: "http://localhost:8000", table: "TestTable"}},
 			wantEndpoint: "http://localhost:8000",
 			wantErr:      false,
 		},
 		{
 			name:    "no-table",
-			args:    args{args: []string{}},
+			args:    args{args: arguments{}},
 			wantErr: true,
 		},
 		{
 			name:      "table-set",
-			args:      args{args: []string{"TestTable"}},
+			args:      args{args: arguments{table: "TestTable"}},
 			wantTable: "TestTable",
 			wantErr:   false,
 		},
