@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"golang.org/x/sync/errgroup"
+	"io/ioutil"
+	"log"
 	"math"
 	"os"
 	"time"
@@ -86,6 +88,9 @@ type configuration struct {
 
 	// maxRetries is the number of times a failed network request is retried
 	maxRetries uint
+
+	// log is used to output debug information
+	logger *log.Logger
 }
 
 func newConfig(args []string) (configuration, error) {
@@ -104,10 +109,16 @@ func newConfig(args []string) (configuration, error) {
 		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
 	}
 
+	var logOutput = ioutil.Discard
+	if parsedArguments.debug {
+		logOutput = os.Stdout
+	}
+
 	return configuration{
 		table:      parsedArguments.table,
 		db:         dynamodb.New(sess),
 		maxRetries: parsedArguments.retries,
+		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
 	}, nil
 }
 
@@ -116,6 +127,7 @@ type arguments struct {
 	endpoint string
 	table    string
 	retries  uint
+	debug    bool
 }
 
 func parseArguments(args []string) (arguments, error) {
@@ -125,6 +137,7 @@ func parseArguments(args []string) (arguments, error) {
 	region := flags.String("region", "", "AWS region to use")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	retries := flags.Uint("max-retries", defaultMaxRetries, "maximum number of retries (default: 10)")
+	debug := flags.Bool("debug", false, "show debug information")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -138,6 +151,7 @@ func parseArguments(args []string) (arguments, error) {
 		endpoint: *endpoint,
 		table:    table,
 		retries:  *retries,
+		debug:    *debug,
 	}, nil
 }
 
@@ -167,23 +181,31 @@ func newAwsConfig(args arguments) *aws.Config {
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
+	config.logger.Printf("retrieving table information for table %s\n", config.table)
+
 	input := &dynamodb.DescribeTableInput{
 		TableName: aws.String(config.table),
 	}
+	config.logger.Printf("DescribeTableInput: %s\n", input)
 
 	output, err := config.db.DescribeTable(input)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table information for table %s: %w", config.table, err)
 	}
+	config.logger.Printf("DescribeTableOutput: %s\n", output)
 
 	return output, nil
 }
 
 func truncateTable(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput) error {
+	config.logger.Println("start truncating table")
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	segments := 4
 	for segment := 0; segment < segments; segment++ {
+		config.logger.Printf("start segment %d of %d\n", segment, segments)
+
 		total := segments
 		current := segment
 		g.Go(func() error {
@@ -200,6 +222,8 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 }
 
 func processSegment(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, g *errgroup.Group) error {
+	config.logger.Printf("start processing segment %d\n", segment)
+
 	expr, err := newProjection(tableInfo)
 	if err != nil {
 		return err
@@ -212,6 +236,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		TotalSegments:            aws.Int64(int64(totalSegments)),
 		Segment:                  aws.Int64(int64(segment)),
 	}
+	config.logger.Printf("ScanInput: %s\n", input)
 
 	err = config.db.ScanPagesWithContext(ctx, input, func(page *dynamodb.ScanOutput, lastPage bool) bool {
 		g.Go(func() error {
@@ -223,6 +248,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		return err
 	}
 
+	config.logger.Printf("finish processing segment %d\n", segment)
 	return nil
 }
 
@@ -283,6 +309,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 
 		if retry > 0 {
 			sleepDuration := time.Duration(math.Pow(backoffBase, float64(retry))) * time.Second
+			config.logger.Printf("sleeping for %v seconds", sleepDuration)
 			time.Sleep(sleepDuration)
 		}
 
