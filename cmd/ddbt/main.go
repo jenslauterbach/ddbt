@@ -188,7 +188,7 @@ type statistics struct {
 	deleted uint64
 }
 
-func (s *statistics) increaseDeleted(n uint) {
+func (s *statistics) increaseDeleted(n uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.deleted += n
@@ -354,7 +354,7 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 }
 
 func deleteBatch(ctx context.Context, config configuration, items []map[string]*dynamodb.AttributeValue) error {
-	bSize := len(items)
+	bSize := uint64(len(items))
 	var processed uint64
 
 	requests := make([]*dynamodb.WriteRequest, bSize)
@@ -391,7 +391,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 
 		unprocessed = output.UnprocessedItems
 
-		processed = bSize - processed - len(unprocessed)
+		processed = bSize - processed - uint64(len(unprocessed))
 		config.stats.increaseDeleted(processed)
 
 		retry++
