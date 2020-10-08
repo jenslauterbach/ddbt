@@ -54,4 +54,4 @@ This project uses SemVer for versioning. For the versions available, see the [re
 
 [(Back to top)](#table-of-contents)
 
-This project is licensed under the Apache 2.0 License - see the [LICENSE](https://github.com/jenslauterbach/Base32Kit/blob/master/LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](https://github.com/jenslauterbach/ddbt/blob/master/LICENSE) file for details.
