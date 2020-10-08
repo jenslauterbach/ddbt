@@ -52,8 +52,10 @@ Options:
 )
 
 var (
-	// commandVersion is the version of the ddbt tool, which is set at build time using ldflags
-	commandVersion  = "development"
+	// The following variables are set by goreleaser:
+	version = "dev"
+	date    = "unknown"
+
 	errTableMissing = errors.New("no table name provided")
 	errReadPipe     = errors.New("unable to read table name from pipe (stdin)")
 )
@@ -78,7 +80,7 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.version {
-		fmt.Fprintf(os.Stdout, "ddbt %s\n", commandVersion)
+		fmt.Fprintf(os.Stdout, "ddbt %s\n (built at %s)", version, date)
 		return nil
 	}
 
