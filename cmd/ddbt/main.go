@@ -80,7 +80,7 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.version {
-		fmt.Fprintf(os.Stdout, "ddbt %s\n (built at %s)", version, date)
+		fmt.Fprintf(os.Stdout, "ddbt %s (built at %s)\n", version, date)
 		return nil
 	}
 
@@ -342,10 +342,6 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 			to = total
 		}
 
-		if config.dryRun {
-			continue
-		}
-
 		err := deleteBatch(ctx, config, page.Items[from:to])
 		if err != nil {
 			return err
@@ -386,12 +382,16 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 			RequestItems: unprocessed,
 		}
 
-		output, err := config.db.BatchWriteItemWithContext(ctx, input)
-		if err != nil {
-			return fmt.Errorf("unable to send delete requests: %w", err)
-		}
+		if !config.dryRun {
+			output, err := config.db.BatchWriteItemWithContext(ctx, input)
+			if err != nil {
+				return fmt.Errorf("unable to send delete requests: %w", err)
+			}
 
-		unprocessed = output.UnprocessedItems
+			unprocessed = output.UnprocessedItems
+		} else {
+			unprocessed = map[string][]*dynamodb.WriteRequest{}
+		}
 
 		processed = bSize - processed - uint64(len(unprocessed))
 		config.stats.increaseDeleted(processed)
