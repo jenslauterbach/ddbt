@@ -42,11 +42,12 @@ const (
 	usage = `Usage: ddbt [options...] <table-name>
 
 Options:
-  --region		AWS region of DynamoDB table (overwrite default region)
-  --endpoint-url	Custom endpoint url (overwrite default endpoint)
-  --max-retries		Maximum number of retries (default: 10)
+  --debug		Show debug information
   --dry-run		Simulate truncating table
+  --endpoint-url	Custom endpoint url (overwrite default endpoint)
   --help		This help text
+  --max-retries		Maximum number of retries (default: 10)
+  --region		AWS region of DynamoDB table (overwrite default region)
   --version		Show version number and quit
 `
 )
