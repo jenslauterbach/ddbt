@@ -17,6 +17,7 @@ import (
 	"math"
 	"os"
 	"sync"
+	"text/tabwriter"
 	"time"
 )
 
@@ -70,6 +71,8 @@ func main() {
 }
 
 func run(args []string) error {
+	start := time.Now()
+
 	parsedArguments, err := parseArguments(flag.CommandLine, args)
 	if err != nil {
 		return err
@@ -97,6 +100,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	defer printStatistics(config.stats, start)
 
 	tableInfo, err := retrieveTableInformation(config)
 	if err != nil {
@@ -108,8 +112,15 @@ func run(args []string) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "Truncated %d items from table %s\n", config.stats.deleted, config.table)
 	return nil
+}
+
+func printStatistics(stats *statistics, start time.Time) {
+	fmt.Printf("\nStatistics:\n\n")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+	fmt.Fprintf(w, fmt.Sprintf("Deleted items:\t%d\n", stats.deleted))
+	fmt.Fprintf(w, fmt.Sprintf("Duration:\t%v\n", time.Since(start)))
+	w.Flush()
 }
 
 type arguments struct {
