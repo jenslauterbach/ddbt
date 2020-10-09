@@ -179,18 +179,14 @@ func isInputFromPipe() bool {
 type configuration struct {
 	// table is the name of the DynamoDB table to be truncated
 	table string
-
 	// db is the client used to interact with DynamoDB
 	db dynamodbiface.DynamoDBAPI
-
 	// maxRetries is the number of times a failed network request is retried
 	maxRetries uint
-
 	// log is used to output debug information
 	logger *log.Logger
-
+	// dryRun allows running the program without actually deleting items from DynamoDB
 	dryRun bool
-
 	// stats keeps track of deleted of important statistics related to the process of truncating the table, like number
 	// of deleted or failed items or how much capacity was consumed.
 	stats *statistics
