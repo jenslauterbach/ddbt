@@ -120,6 +120,8 @@ func printStatistics(stats *statistics, start time.Time) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 	fmt.Fprintf(w, fmt.Sprintf("Deleted items:\t%d\n", stats.deleted))
 	fmt.Fprintf(w, fmt.Sprintf("Duration:\t%v\n", time.Since(start)))
+	fmt.Fprintf(w, fmt.Sprintf("Consumed Read Capacity Units:\t%v\n", stats.rcu))
+	fmt.Fprintf(w, fmt.Sprintf("Consumed Write Capacity Units:\t%v\n", stats.wcu))
 	w.Flush()
 }
 
@@ -196,12 +198,28 @@ type statistics struct {
 	mu sync.Mutex
 	// deleted number of items
 	deleted uint64
+	// rcu is the number of consumed read capacity units
+	rcu float64
+	// wcu is the number of consumed write capacity units
+	wcu float64
 }
 
 func (s *statistics) increaseDeleted(n uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.deleted += n
+}
+
+func (s *statistics) addRCU(n float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rcu += n
+}
+
+func (s *statistics) addWCU(n float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.wcu += n
 }
 
 func newConfig(args arguments) (configuration, error) {
@@ -306,10 +324,13 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		ExpressionAttributeNames: expr.Names(),
 		TotalSegments:            aws.Int64(int64(totalSegments)),
 		Segment:                  aws.Int64(int64(segment)),
+		ReturnConsumedCapacity:   aws.String("TOTAL"),
 	}
 	config.logger.Printf("ScanInput: %s\n", input)
 
 	err = config.db.ScanPagesWithContext(ctx, input, func(page *dynamodb.ScanOutput, lastPage bool) bool {
+		config.stats.addRCU(*page.ConsumedCapacity.CapacityUnits)
+
 		g.Go(func() error {
 			return processPage(ctx, config, page)
 		})
@@ -387,13 +408,18 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 		}
 
 		input := &dynamodb.BatchWriteItemInput{
-			RequestItems: unprocessed,
+			RequestItems:           unprocessed,
+			ReturnConsumedCapacity: aws.String("TOTAL"),
 		}
 
 		if !config.dryRun {
 			output, err := config.db.BatchWriteItemWithContext(ctx, input)
 			if err != nil {
 				return fmt.Errorf("unable to send delete requests: %w", err)
+			}
+
+			for _, u := range output.ConsumedCapacity {
+				config.stats.addWCU(*u.CapacityUnits)
 			}
 
 			unprocessed = output.UnprocessedItems
