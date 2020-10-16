@@ -82,15 +82,6 @@ Running **ddbt** will cause costs, because of the way **ddbt** works. First a `S
 
 The actual cost depends on your capacity mode (on-demand or provisioned).
 
-Example:
-
-* Number of items: 1,000,000 (1 million)
-* Partition key: [UUIDv4](https://tools.ietf.org/html/rfc4122) (`16fd2706-8baf-433b-82eb-8c7fada847da`)
-* Sort key: [RFC3339 date](https://tools.ietf.org/html/rfc3339) (`1985-04-12T23:20:50.52Z`)
-* Capacity mode: provisioned
-* Read mode: eventually consistent
-* Item size: max. 4kb
-
 ## Design Goals
 [(Back to top)](#table-of-contents)
 
