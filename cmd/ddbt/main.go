@@ -14,7 +14,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -33,10 +32,6 @@ const (
 	// defaultMaxRetries is the default number of times the program will retry failed AWS requests. The value can be
 	// overwritten using the --max-retries command line argument.
 	defaultMaxRetries = 10
-
-	// backoffBase is the "base" used by the exponential backoff algorithm to determine when the next request should be
-	// send.
-	backoffBase = 1.5
 
 	// usage is the message that is displayed when the user explicitly uses the --help flag or when there is an error
 	// and the user is to be informed about proper usage of ddbt.
@@ -129,7 +124,7 @@ type arguments struct {
 	region   string
 	endpoint string
 	table    string
-	retries  uint
+	retries  int
 	debug    bool
 	help     bool
 	version  bool
@@ -139,7 +134,7 @@ type arguments struct {
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	region := flags.String("region", "", "AWS region to use")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
-	retries := flags.Uint("max-retries", defaultMaxRetries, "maximum number of retries (default: 10)")
+	retries := flags.Int("max-retries", defaultMaxRetries, fmt.Sprintf("maximum number of retries (default: %d)", defaultMaxRetries))
 	debug := flags.Bool("debug", false, "show debug information")
 	help := flags.Bool("help", false, "show help text")
 	version := flags.Bool("version", false, "show version")
@@ -183,8 +178,6 @@ type configuration struct {
 	table string
 	// db is the client used to interact with DynamoDB
 	db dynamodbiface.DynamoDBAPI
-	// maxRetries is the number of times a failed network request is retried
-	maxRetries uint
 	// log is used to output debug information
 	logger *log.Logger
 	// dryRun allows running the program without actually deleting items from DynamoDB
@@ -237,7 +230,6 @@ func newConfig(args arguments) (configuration, error) {
 	return configuration{
 		table:      args.table,
 		db:         dynamodb.New(sess),
-		maxRetries: args.retries,
 		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
 		dryRun:     args.dryRun,
 		stats:      &statistics{},
@@ -250,6 +242,8 @@ func newAwsConfig(args arguments) *aws.Config {
 	if args.region != "" {
 		config.Region = &args.region
 	}
+
+	config.MaxRetries = aws.Int(args.retries)
 
 	if args.endpoint != "" {
 		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
@@ -394,19 +388,8 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 		}
 	}
 
-	retry := uint(0)
 	unprocessed := map[string][]*dynamodb.WriteRequest{config.table: requests}
 	for ok := true; ok; ok = len(unprocessed) > 0 {
-		if retry > config.maxRetries {
-			break
-		}
-
-		if retry > 0 {
-			sleepDuration := time.Duration(math.Pow(backoffBase, float64(retry))) * time.Second
-			config.logger.Printf("sleeping for %v seconds", sleepDuration)
-			time.Sleep(sleepDuration)
-		}
-
 		input := &dynamodb.BatchWriteItemInput{
 			RequestItems:           unprocessed,
 			ReturnConsumedCapacity: aws.String("TOTAL"),
@@ -429,8 +412,6 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 
 		processed = bSize - processed - uint64(len(unprocessed))
 		config.stats.increaseDeleted(processed)
-
-		retry++
 	}
 
 	return nil
