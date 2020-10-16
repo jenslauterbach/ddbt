@@ -2,7 +2,13 @@
 
 > Disclaimer: This tool is in early development. It is *not* recommended to use this tool in production. There is the risk of data loss.
 
-**ddbt** is a simple command line tool that does one job and one job only: delete all items in a [AWS DynamoDB](https://aws.amazon.com/dynamodb/) table.
+> :warning: :bangbang: 
+> Important:
+>
+>   1. This tool has the potential to create a lot of AWS cost.
+>   2. Deleting and re-creating the table is cheaper and faster.
+
+**ddbt** is a simple command line tool that does one job and one job only: delete all items in a [AWS DynamoDB](https://aws.amazon.com/dynamodb/) table. This tool is made for situations where you want to delete all items in a table, but do not want to delete the table. If you can delete and re-create the table, it is recommend to do this. It will be faster and cheaper.
 
 ## Table of Contents
 
@@ -45,7 +51,7 @@ See chapter [Flags and Arguments](#flags-and-arguments) for an overview of all a
 |--dry-run|Simulate truncating table|
 |--endpoint-url|Custom endpoint url (overwrite default endpoint)|
 |--help|Show help text|
-|--max-retries|Maximum number of retries (default: 10)|
+|--max-retries|Maximum number of retries (default: 3)|
 |--region|AWS region of DynamoDB table (overwrite default region)|
 |--version|Show version number and quit|
 
