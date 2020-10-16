@@ -31,7 +31,7 @@ const (
 
 	// defaultMaxRetries is the default number of times the program will retry failed AWS requests. The value can be
 	// overwritten using the --max-retries command line argument.
-	defaultMaxRetries = 10
+	defaultMaxRetries = 3
 
 	// usage is the message that is displayed when the user explicitly uses the --help flag or when there is an error
 	// and the user is to be informed about proper usage of ddbt.
@@ -42,7 +42,7 @@ Options:
   --dry-run		Simulate truncating table
   --endpoint-url	Custom endpoint url (overwrite default endpoint)
   --help		This help text
-  --max-retries		Maximum number of retries (default: 10)
+  --max-retries		Maximum number of retries (default: 3)
   --region		AWS region of DynamoDB table (overwrite default region)
   --version		Show version number and quit
 `
