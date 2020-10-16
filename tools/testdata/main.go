@@ -101,18 +101,18 @@ type configuration struct {
 
 func newConfig() (configuration, error) {
 	region := flag.String("region", "localhost", "AWS region to use")
-	endpoint := flag.String("endpoint-url", "http://localhost:8000", "url of the DynamoDB endpoint to use")
+	endpoint := flag.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	table := flag.String("table-name", "TestTable", "name of the DynamoDB table to truncate")
 	count := flag.Int("count", 1_000, "number of items to insert")
 	flag.Parse()
 
 	awsConfig := &aws.Config{}
 
-	if region != nil {
+	if *region != "" {
 		awsConfig.Region = region
 	}
 
-	if endpoint != nil {
+	if *endpoint != "" {
 		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 			return endpoints.ResolvedEndpoint{
 				URL:           *endpoint,
