@@ -13,6 +13,8 @@
 ## Table of Contents
 
 - [Installation](#installation)
+  - [Download from Github](#download-from-github)
+  - [Using Homebrew](#using-homebrew)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Quick Start](#quick-start)
@@ -25,6 +27,19 @@
 
 ## Installation
 [(Back to top)](#table-of-contents)
+
+### Download from Github
+
+You can go to the release page and download a pre-compiled binary for your operating system: [Release page](https://github.com/jenslauterbach/ddbt/releases/latest)
+
+### Using Homebrew
+
+To install **ddbt** using [brew](https://brew.sh) on macOS or supported Linux distributions, run the following commands:
+
+```shell script
+brew tap jenslauterbach/ddbt
+brew install ddbt
+```
 
 ## Configuration
 [(Back to top)](#table-of-contents)
