@@ -42,6 +42,7 @@ brews:
     tap:
       owner: jenslauterbach
       name: homebrew-ddbt
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     # Allows you to set a custom download strategy. Note that you'll need
     # to implement the strategy and add it to your tap repository.
