@@ -113,10 +113,10 @@ func run(args []string) error {
 func printStatistics(stats *statistics, start time.Time) {
 	fmt.Printf("\nStatistics:\n\n")
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-	fmt.Fprintf(w, fmt.Sprintf("Deleted items:\t%d\n", stats.deleted))
-	fmt.Fprintf(w, fmt.Sprintf("Duration:\t%v\n", time.Since(start)))
-	fmt.Fprintf(w, fmt.Sprintf("Consumed Read Capacity Units:\t%v\n", stats.rcu))
-	fmt.Fprintf(w, fmt.Sprintf("Consumed Write Capacity Units:\t%v\n", stats.wcu))
+	fmt.Fprintf(w, "Deleted items:\t%d\n", stats.deleted)
+	fmt.Fprintf(w, "Duration:\t%v\n", time.Since(start))
+	fmt.Fprintf(w, "Consumed Read Capacity Units:\t%v\n", stats.rcu)
+	fmt.Fprintf(w, "Consumed Write Capacity Units:\t%v\n", stats.wcu)
 	w.Flush()
 }
 
