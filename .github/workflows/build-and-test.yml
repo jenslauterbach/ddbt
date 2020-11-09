@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths: 
+    paths:
       - '**.go'
   pull_request:
     branches: [ main ]
-    paths: 
+    paths:
       - '**.go'
 
 jobs:
