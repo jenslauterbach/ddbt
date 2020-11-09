@@ -228,11 +228,11 @@ func newConfig(args arguments) (configuration, error) {
 	}
 
 	return configuration{
-		table:      args.table,
-		db:         dynamodb.New(sess),
-		logger:     log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
-		dryRun:     args.dryRun,
-		stats:      &statistics{},
+		table:  args.table,
+		db:     dynamodb.New(sess),
+		logger: log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		dryRun: args.dryRun,
+		stats:  &statistics{},
 	}, nil
 }
 
