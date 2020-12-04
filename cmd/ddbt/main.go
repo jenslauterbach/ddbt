@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"golang.org/x/sync/errgroup"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -102,12 +104,42 @@ func run(args []string) error {
 		return err
 	}
 
+	if !parsedArguments.noninteractive {
+		reader := bufio.NewReader(os.Stdin)
+		ok := askForConfirmation(config, reader, tableInfo)
+		if !ok {
+			return nil
+		}
+	}
+
 	err = truncateTable(context.Background(), config, tableInfo)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func askForConfirmation(config configuration, reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput) bool {
+	fmt.Printf("Do you really want to delete approximatelly %d items from table %s? [Y/n] ", *tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
+
+	input, _, err := reader.ReadRune()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Unable to read your input. Aborting truncate operation. For more detail run with --debug.")
+		config.logger.Printf("error: %v\n", err.Error())
+		return false
+	}
+
+	switch input {
+	case 'Y':
+		return true
+	case 'n':
+		fmt.Fprintln(os.Stderr, "You selected 'n'. Aborting truncate operation.")
+		return false
+	default:
+		fmt.Fprintln(os.Stderr, "Neither 'Y' nor 'n' selected. Aborting truncate operation.")
+		return false
+	}
 }
 
 func printStatistics(stats *statistics, start time.Time) {
@@ -121,14 +153,15 @@ func printStatistics(stats *statistics, start time.Time) {
 }
 
 type arguments struct {
-	region   string
-	endpoint string
-	table    string
-	retries  int
-	debug    bool
-	help     bool
-	version  bool
-	dryRun   bool
+	region         string
+	endpoint       string
+	table          string
+	retries        int
+	debug          bool
+	help           bool
+	version        bool
+	dryRun         bool
+	noninteractive bool
 }
 
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
@@ -139,6 +172,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	help := flags.Bool("help", false, "show help text")
 	version := flags.Bool("version", false, "show version")
 	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
+	noninteractive := flags.Bool("non-interactive", false, "run command without actually deleting items")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -157,14 +191,15 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	}
 
 	return arguments{
-		region:   *region,
-		endpoint: *endpoint,
-		table:    table,
-		retries:  *retries,
-		debug:    *debug,
-		help:     *help,
-		version:  *version,
-		dryRun:   *dry,
+		region:         *region,
+		endpoint:       *endpoint,
+		table:          table,
+		retries:        *retries,
+		debug:          *debug,
+		help:           *help,
+		version:        *version,
+		dryRun:         *dry,
+		noninteractive: *noninteractive,
 	}, nil
 }
 
