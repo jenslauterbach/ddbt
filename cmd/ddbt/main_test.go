@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"ddbt/internal"
 	"fmt"
@@ -303,6 +304,36 @@ func Test_newConfig(t *testing.T) {
 					t.Errorf("newConfig() endpoint = %s, wantEndpoint = %s", gotEndpoint.URL, tt.wantEndpoint)
 					return
 				}
+			}
+		})
+	}
+}
+
+func Test_askForConfirmation(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  bool
+	}{
+		{"confirm", "Y", true},
+		{"y", "y", false},
+		{"abort", "n", false},
+		{"uppercase-N", "N", false},
+		{"word", "test", false},
+		{"1", "1", false},
+		{"0", "0", false},
+	}
+
+	tableInfo := &dynamodb.DescribeTableOutput{
+		Table: &dynamodb.TableDescription{TableArn: aws.String("test"), ItemCount: aws.Int64(1337)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := askForConfirmation(configuration{}, bytes.NewBufferString(tt.input), tableInfo)
+
+			if got != tt.want {
+				t.Errorf("askForConfirmation() got = %v, want = %v", got, tt.want)
 			}
 		})
 	}
