@@ -97,7 +97,6 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	defer printStatistics(config.stats, start)
 
 	tableInfo, err := retrieveTableInformation(config)
 	if err != nil {
@@ -111,6 +110,8 @@ func run(args []string) error {
 			return nil
 		}
 	}
+
+	defer printStatistics(config.stats, start)
 
 	err = truncateTable(context.Background(), config, tableInfo)
 	if err != nil {
