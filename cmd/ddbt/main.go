@@ -349,9 +349,16 @@ func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutp
 }
 
 func truncateTable(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput) error {
-	pterm.Info.Printf("Truncating table %s\n", *tableInfo.Table.TableArn)
-
+	// The following code will create 'n' segments. Each segment will be run in its own Go routine, to allow parallel
+	// processing of those segments. Each segment itself will process a chunk of the table in so called pages. This
+	// will create some parallelism. To stop processing if an error occurs in any of the segments, a "errgroup" is used.
+	// An error in one Go routine will cancel all the other Go routines.
 	g, ctx := errgroup.WithContext(ctx)
+
+	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("Truncating table %s", *tableInfo.Table.TableArn))
+	if err != nil {
+		return err
+	}
 
 	segments := 4
 	for segment := 0; segment < segments; segment++ {
@@ -364,12 +371,12 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 		})
 	}
 
-	err := g.Wait()
+	err = g.Wait()
 	if err != nil {
 		return err
 	}
 
-	pterm.Success.Printf("Truncated table %s\n", *tableInfo.Table.TableArn)
+	spinner.Success(fmt.Sprintf("Truncated table %s", *tableInfo.Table.TableArn))
 
 	return nil
 }
@@ -397,7 +404,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			// TODO: Report error and keep going? Add fail fast flag?
+			pterm.Error.Printf("Unable to get next page. Continuing with next page. Cause: %v\n", err)
 			continue
 		}
 
