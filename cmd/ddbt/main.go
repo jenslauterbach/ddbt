@@ -47,6 +47,7 @@ Options:
   --help		This help text
   --max-retries		Maximum number of retries (default: 3)
   --no-input		Do not require any input
+  --profile		AWS profile to use
   --region		AWS region of DynamoDB table (overwrite default region)
   --version		Show version number and quit
 `
@@ -157,6 +158,7 @@ func printStatistics(stats *statistics, start time.Time) {
 
 type arguments struct {
 	region   string
+	profile  string
 	endpoint string
 	table    string
 	retries  int
@@ -169,6 +171,7 @@ type arguments struct {
 
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	region := flags.String("region", "", "AWS region to use")
+	profile := flags.String("profile", "", "AWS profile to use")
 	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
 	retries := flags.Int("max-retries", defaultMaxRetries, fmt.Sprintf("maximum number of retries (default: %d)", defaultMaxRetries))
 	debug := flags.Bool("debug", false, "show debug information")
@@ -195,6 +198,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 
 	return arguments{
 		region:   *region,
+		profile:  *profile,
 		endpoint: *endpoint,
 		table:    table,
 		retries:  *retries,
@@ -270,11 +274,19 @@ func newConfig(args arguments) (configuration, error) {
 	}, nil
 }
 
+// newAwsConfig returns a AWS configuration based on the options the user selected on the command line.
 func newAwsConfig(args arguments) aws.Config {
+	// The options array will be updated within this function based on the provided command line arguments. At the end
+	// the array will be passed to 'LoadDefaultConfig()' to create a AWS configuration for the DynamoDB client that
+	// reflects the options the user has selected on the command line.
 	var options []func(*config.LoadOptions) error
 
 	if args.region != "" {
 		options = append(options, config.WithRegion(args.region))
+	}
+
+	if args.profile != "" {
+		options = append(options, config.WithSharedConfigProfile(args.profile))
 	}
 
 	options = append(options, config.WithRetryer(func() aws.Retryer {
@@ -297,9 +309,10 @@ func newAwsConfig(args arguments) aws.Config {
 		options = append(options, config.WithEndpointResolver(resolver))
 	}
 
-	c, _ := config.LoadDefaultConfig(context.TODO(), options...)
+	// TODO: handle error.
+	cfg, _ := config.LoadDefaultConfig(context.TODO(), options...)
 
-	return c
+	return cfg
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
