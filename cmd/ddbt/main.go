@@ -46,6 +46,7 @@ Options:
   --endpoint-url	Custom endpoint url (overwrite default endpoint)
   --help		This help text
   --max-retries		Maximum number of retries (default: 3)
+  --no-input		Do not require any input
   --region		AWS region of DynamoDB table (overwrite default region)
   --version		Show version number and quit
 `
@@ -104,7 +105,7 @@ func run(args []string) error {
 		return err
 	}
 
-	if !parsedArguments.noninteractive {
+	if !parsedArguments.noInput {
 		reader := bufio.NewReader(os.Stdin)
 		ok := askForConfirmation(conf, reader, tableInfo)
 		if !ok {
@@ -155,15 +156,15 @@ func printStatistics(stats *statistics, start time.Time) {
 }
 
 type arguments struct {
-	region         string
-	endpoint       string
-	table          string
-	retries        int
-	debug          bool
-	help           bool
-	version        bool
-	dryRun         bool
-	noninteractive bool
+	region   string
+	endpoint string
+	table    string
+	retries  int
+	debug    bool
+	help     bool
+	version  bool
+	dryRun   bool
+	noInput  bool
 }
 
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
@@ -174,7 +175,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	help := flags.Bool("help", false, "show help text")
 	version := flags.Bool("version", false, "show version")
 	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
-	noninteractive := flags.Bool("non-interactive", false, "run command without actually deleting items")
+	noInput := flags.Bool("no-input", false, "Do not require any input")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -193,15 +194,15 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	}
 
 	return arguments{
-		region:         *region,
-		endpoint:       *endpoint,
-		table:          table,
-		retries:        *retries,
-		debug:          *debug,
-		help:           *help,
-		version:        *version,
-		dryRun:         *dry,
-		noninteractive: *noninteractive,
+		region:   *region,
+		endpoint: *endpoint,
+		table:    table,
+		retries:  *retries,
+		debug:    *debug,
+		help:     *help,
+		version:  *version,
+		dryRun:   *dry,
+		noInput:  *noInput,
 	}, nil
 }
 
