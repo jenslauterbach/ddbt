@@ -69,6 +69,7 @@ See chapter [Flags and Arguments](#flags-and-arguments) for an overview of all a
 |--max-retries|Maximum number of retries (default: 3)|
 |--no-input|Do not require any input|
 |--profile|AWS profile to use|
+|--quiet|Disable all output (except for required input)|
 |--region|AWS region of DynamoDB table (overwrite default region)|
 |--version|Show version number and quit|
 
