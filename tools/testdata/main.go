@@ -1,14 +1,14 @@
 package main
 
 import (
+	"context"
 	"ddbt/internal"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"os"
 )
 
@@ -27,13 +27,13 @@ func main() {
 }
 
 func run() error {
-	config, err := newConfig()
+	conf, err := newConfig()
 	if err != nil {
 		return err
 	}
 
-	items := createItems(config.count)
-	insertItems(config, items)
+	items := createItems(conf.count)
+	insertItems(conf, items)
 
 	return nil
 }
@@ -67,25 +67,25 @@ func insertItems(config configuration, items []string) {
 }
 
 func putBatch(config configuration, items []string) error {
-	requests := make([]*dynamodb.WriteRequest, len(items))
+	requests := make([]types.WriteRequest, len(items))
 
 	for index, item := range items {
-		requests[index] = &dynamodb.WriteRequest{
-			PutRequest: &dynamodb.PutRequest{
-				Item: map[string]*dynamodb.AttributeValue{
-					"Name": {S: aws.String(item)},
+		requests[index] = types.WriteRequest{
+			PutRequest: &types.PutRequest{
+				Item: map[string]types.AttributeValue{
+					"Name": &types.AttributeValueMemberS{Value: item},
 				},
 			},
 		}
 	}
 
-	input := &dynamodb.BatchWriteItemInput{
-		RequestItems: map[string][]*dynamodb.WriteRequest{
+	params := &dynamodb.BatchWriteItemInput{
+		RequestItems: map[string][]types.WriteRequest{
 			config.table: requests,
 		},
 	}
 
-	_, err := config.db.BatchWriteItem(input)
+	_, err := config.db.BatchWriteItem(context.TODO(), params)
 	if err != nil {
 		return fmt.Errorf("unable to write items: %w", err)
 	}
@@ -94,7 +94,7 @@ func putBatch(config configuration, items []string) error {
 }
 
 type configuration struct {
-	db    dynamodbiface.DynamoDBAPI
+	db    *dynamodb.Client
 	table string
 	count int
 }
@@ -106,32 +106,32 @@ func newConfig() (configuration, error) {
 	count := flag.Int("count", 1_000, "number of items to insert")
 	flag.Parse()
 
-	awsConfig := &aws.Config{}
+	var options []func(*config.LoadOptions) error
 
 	if *region != "" {
-		awsConfig.Region = region
+		options = append(options, config.WithRegion(*region))
 	}
 
 	if *endpoint != "" {
-		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-			return endpoints.ResolvedEndpoint{
-				URL:           *endpoint,
-				SigningRegion: region,
-			}, nil
-		}
+		resolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			if service == dynamodb.ServiceID {
+				return aws.Endpoint{
+					PartitionID:   "aws",
+					URL:           *endpoint,
+					SigningRegion: region,
+				}, nil
+			}
 
-		awsConfig.EndpointResolver = endpoints.ResolverFunc(resolver)
+			return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
+		})
+
+		options = append(options, config.WithEndpointResolver(resolver))
 	}
 
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
-	}
-
-	db := dynamodb.New(sess)
+	c, _ := config.LoadDefaultConfig(context.TODO(), options...)
 
 	return configuration{
-		db:    db,
+		db:    dynamodb.NewFromConfig(c),
 		table: *table,
 		count: *count,
 	}, nil
