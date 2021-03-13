@@ -67,6 +67,7 @@ See chapter [Flags and Arguments](#flags-and-arguments) for an overview of all a
 |--endpoint-url|Custom endpoint url (overwrite default endpoint)|
 |--help|Show help text|
 |--max-retries|Maximum number of retries (default: 3)|
+|--no-input|Do not require any input|
 |--region|AWS region of DynamoDB table (overwrite default region)|
 |--version|Show version number and quit|
 
