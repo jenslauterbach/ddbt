@@ -25,13 +25,13 @@ import (
 )
 
 const (
-	// batchSize is the maximum number of items in a batch request send to DynamoDB. The maximum batch size is 25 at
+	// maxBatchSize is the maximum number of items in a batch request send to DynamoDB. The maximum batch size is 25 at
 	// the moment.
 	//
 	// AWS documentation:
 	//
 	// https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html#limits-api
-	batchSize = 25
+	maxBatchSize = 25
 
 	// defaultMaxRetries is the default number of times the program will retry failed AWS requests. The value can be
 	// overwritten using the --max-retries command line argument.
@@ -432,8 +432,8 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 	var total = page.Count
 	var from int32
 	var to int32
-	for from = 0; from < total; from += batchSize {
-		to += batchSize
+	for from = 0; from < total; from += maxBatchSize {
+		to += maxBatchSize
 		if to > total {
 			to = total
 		}
@@ -448,10 +448,10 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 }
 
 func deleteBatch(ctx context.Context, config configuration, items []map[string]types.AttributeValue) error {
-	bSize := uint64(len(items))
+	batchSize := uint64(len(items))
 	var processed uint64
 
-	requests := make([]types.WriteRequest, bSize)
+	requests := make([]types.WriteRequest, batchSize)
 
 	for index, key := range items {
 		requests[index] = types.WriteRequest{
@@ -486,7 +486,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 		}
 
 		unprocessed = output.UnprocessedItems
-		processed = bSize - processed - uint64(len(unprocessed))
+		processed = batchSize - processed - uint64(len(unprocessed))
 		config.stats.increaseDeleted(processed)
 	}
 
