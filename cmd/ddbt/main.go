@@ -6,12 +6,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
-	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
 	"golang.org/x/sync/errgroup"
 	"io"
 	"io/ioutil"
@@ -93,27 +94,27 @@ func run(args []string) error {
 		fmt.Fprintf(os.Stdout, "Performing dry run\n")
 	}
 
-	config, err := newConfig(parsedArguments)
+	conf, err := newConfig(parsedArguments)
 	if err != nil {
 		return err
 	}
 
-	tableInfo, err := retrieveTableInformation(config)
+	tableInfo, err := retrieveTableInformation(conf)
 	if err != nil {
 		return err
 	}
 
 	if !parsedArguments.noninteractive {
 		reader := bufio.NewReader(os.Stdin)
-		ok := askForConfirmation(config, reader, tableInfo)
+		ok := askForConfirmation(conf, reader, tableInfo)
 		if !ok {
 			return nil
 		}
 	}
 
-	defer printStatistics(config.stats, start)
+	defer printStatistics(conf.stats, start)
 
-	err = truncateTable(context.Background(), config, tableInfo)
+	err = truncateTable(context.Background(), conf, tableInfo)
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func run(args []string) error {
 }
 
 func askForConfirmation(config configuration, reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput) bool {
-	fmt.Printf("Do you really want to delete approximatelly %d items from table %s? [Y/n] ", *tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
+	fmt.Printf("Do you really want to delete approximatelly %d items from table %s? [Y/n] ", tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
 
 	input, _, err := reader.ReadRune()
 	if err != nil {
@@ -213,7 +214,7 @@ type configuration struct {
 	// table is the name of the DynamoDB table to be truncated
 	table string
 	// db is the client used to interact with DynamoDB
-	db dynamodbiface.DynamoDBAPI
+	db DynamoDBAPI
 	// log is used to output debug information
 	logger *log.Logger
 	// dryRun allows running the program without actually deleting items from DynamoDB
@@ -253,10 +254,6 @@ func (s *statistics) addWCU(n float64) {
 
 func newConfig(args arguments) (configuration, error) {
 	awsConfig := newAwsConfig(args)
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return configuration{}, fmt.Errorf("unable to create new session: %w", err)
-	}
 
 	var logOutput = ioutil.Discard
 	if args.debug {
@@ -265,53 +262,58 @@ func newConfig(args arguments) (configuration, error) {
 
 	return configuration{
 		table:  args.table,
-		db:     dynamodb.New(sess),
+		db:     dynamodb.NewFromConfig(awsConfig),
 		logger: log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
 		dryRun: args.dryRun,
 		stats:  &statistics{},
 	}, nil
 }
 
-func newAwsConfig(args arguments) *aws.Config {
-	config := &aws.Config{}
+func newAwsConfig(args arguments) aws.Config {
+	var options []func(*config.LoadOptions) error
 
 	if args.region != "" {
-		config.Region = &args.region
+		options = append(options, config.WithRegion(args.region))
 	}
 
-	config.MaxRetries = aws.Int(args.retries)
+	options = append(options, config.WithRetryer(func() aws.Retryer {
+		return retry.AddWithMaxAttempts(retry.NewStandard(), 5)
+	}))
 
 	if args.endpoint != "" {
-		resolver := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-			if service == endpoints.DynamodbServiceID {
-				return endpoints.ResolvedEndpoint{
+		resolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			if service == dynamodb.ServiceID {
+				return aws.Endpoint{
+					PartitionID:   "aws",
 					URL:           args.endpoint,
 					SigningRegion: region,
 				}, nil
 			}
 
-			return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
-		}
+			return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
+		})
 
-		config.EndpointResolver = endpoints.ResolverFunc(resolver)
+		options = append(options, config.WithEndpointResolver(resolver))
 	}
 
-	return config
+	c, _ := config.LoadDefaultConfig(context.TODO(), options...)
+
+	return c
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
 	config.logger.Printf("retrieving table information for table %s\n", config.table)
 
-	input := &dynamodb.DescribeTableInput{
+	params := &dynamodb.DescribeTableInput{
 		TableName: aws.String(config.table),
 	}
-	config.logger.Printf("DescribeTableInput: %s\n", input)
+	config.logger.Printf("DescribeTableInput: %v\n", params)
 
-	output, err := config.db.DescribeTable(input)
+	output, err := config.db.DescribeTable(context.TODO(), params)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table information for table %s: %w", config.table, err)
 	}
-	config.logger.Printf("DescribeTableOutput: %s\n", output)
+	config.logger.Printf("DescribeTableOutput: %v\n", *output)
 
 	return output, nil
 }
@@ -348,33 +350,37 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		return err
 	}
 
-	input := &dynamodb.ScanInput{
+	params := &dynamodb.ScanInput{
 		TableName:                aws.String(config.table),
 		ProjectionExpression:     expr.Projection(),
 		ExpressionAttributeNames: expr.Names(),
-		TotalSegments:            aws.Int64(int64(totalSegments)),
-		Segment:                  aws.Int64(int64(segment)),
-		ReturnConsumedCapacity:   aws.String("TOTAL"),
+		TotalSegments:            aws.Int32(int32(totalSegments)),
+		Segment:                  aws.Int32(int32(segment)),
+		ReturnConsumedCapacity:   types.ReturnConsumedCapacityTotal,
 	}
-	config.logger.Printf("ScanInput: %s\n", input)
+	config.logger.Printf("ScanInput: %v\n", params)
 
-	err = config.db.ScanPagesWithContext(ctx, input, func(page *dynamodb.ScanOutput, lastPage bool) bool {
+	paginator := dynamodb.NewScanPaginator(config.db, params)
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			// TODO: Report error and keep going? Add fail fast flag?
+			continue
+		}
+
 		config.stats.addRCU(*page.ConsumedCapacity.CapacityUnits)
 
 		g.Go(func() error {
 			return processPage(ctx, config, page)
 		})
-		return true
-	})
-	if err != nil {
-		return err
 	}
 
 	config.logger.Printf("finish processing segment %d\n", segment)
 	return nil
 }
 
-func newProjection(keys []*dynamodb.KeySchemaElement) (*expression.Expression, error) {
+func newProjection(keys []types.KeySchemaElement) (*expression.Expression, error) {
 	// There is at least one key in the table. This one will be added by default. If there is a second key, it is added
 	// to the projection as well.
 	projection := expression.NamesList(expression.Name(*keys[0].AttributeName))
@@ -392,9 +398,9 @@ func newProjection(keys []*dynamodb.KeySchemaElement) (*expression.Expression, e
 }
 
 func processPage(ctx context.Context, config configuration, page *dynamodb.ScanOutput) error {
-	var total = *page.Count
-	var from int64
-	var to int64
+	var total = page.Count
+	var from int32
+	var to int32
 	for from = 0; from < total; from += batchSize {
 		to += batchSize
 		if to > total {
@@ -410,29 +416,29 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 	return nil
 }
 
-func deleteBatch(ctx context.Context, config configuration, items []map[string]*dynamodb.AttributeValue) error {
+func deleteBatch(ctx context.Context, config configuration, items []map[string]types.AttributeValue) error {
 	bSize := uint64(len(items))
 	var processed uint64
 
-	requests := make([]*dynamodb.WriteRequest, bSize)
+	requests := make([]types.WriteRequest, bSize)
 
 	for index, key := range items {
-		requests[index] = &dynamodb.WriteRequest{
-			DeleteRequest: &dynamodb.DeleteRequest{
+		requests[index] = types.WriteRequest{
+			DeleteRequest: &types.DeleteRequest{
 				Key: key,
 			},
 		}
 	}
 
-	unprocessed := map[string][]*dynamodb.WriteRequest{config.table: requests}
+	unprocessed := map[string][]types.WriteRequest{config.table: requests}
 	for ok := true; ok; ok = len(unprocessed) > 0 {
-		input := &dynamodb.BatchWriteItemInput{
+		params := &dynamodb.BatchWriteItemInput{
 			RequestItems:           unprocessed,
-			ReturnConsumedCapacity: aws.String("TOTAL"),
+			ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
 		}
 
 		if !config.dryRun {
-			output, err := config.db.BatchWriteItemWithContext(ctx, input)
+			output, err := config.db.BatchWriteItem(ctx, params)
 			if err != nil {
 				return fmt.Errorf("unable to send delete requests: %w", err)
 			}
@@ -443,7 +449,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 
 			unprocessed = output.UnprocessedItems
 		} else {
-			unprocessed = map[string][]*dynamodb.WriteRequest{}
+			unprocessed = map[string][]types.WriteRequest{}
 		}
 
 		processed = bSize - processed - uint64(len(unprocessed))
@@ -451,4 +457,10 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]*
 	}
 
 	return nil
+}
+
+type DynamoDBAPI interface {
+	BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
+	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
+	Scan(context.Context, *dynamodb.ScanInput, ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 }
