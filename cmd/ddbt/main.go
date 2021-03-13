@@ -49,6 +49,7 @@ Options:
   --max-retries		Maximum number of retries (default: 3)
   --no-input		Do not require any input
   --profile		AWS profile to use
+  --quiet		Disable all output (except for required input)
   --region		AWS region of DynamoDB table (overwrite default region)
   --version		Show version number and quit
 `
@@ -103,6 +104,10 @@ func run(args []string) error {
 		pterm.EnableDebugMessages()
 	}
 
+	if parsedArguments.quiet {
+		pterm.DisableOutput()
+	}
+
 	conf, err := newConfig(parsedArguments)
 	if err != nil {
 		return err
@@ -132,7 +137,11 @@ func run(args []string) error {
 }
 
 func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput) bool {
+	// Explicitly enable output before showing the question. The user might have used the --quiet flag. If that is the
+	// case the output would not be enabled, the question would not be shown.
+	pterm.EnableOutput()
 	pterm.Warning.Printf("Do you really want to delete approximately %d items from table %s? [Y/n] ", tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
+	pterm.DisableOutput()
 
 	input, _, err := reader.ReadRune()
 	if err != nil {
@@ -178,6 +187,7 @@ type arguments struct {
 	version  bool
 	dryRun   bool
 	noInput  bool
+	quiet    bool
 }
 
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
@@ -190,6 +200,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	version := flags.Bool("version", false, "show version")
 	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
 	noInput := flags.Bool("no-input", false, "Do not require any input")
+	quiet := flags.Bool("quiet", false, "Disable all output (except for required input)")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -218,6 +229,7 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		version:  *version,
 		dryRun:   *dry,
 		noInput:  *noInput,
+		quiet:    *quiet,
 	}, nil
 }
 
