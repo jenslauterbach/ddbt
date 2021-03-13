@@ -1,6 +1,6 @@
 module ddbt
 
-go 1.15
+go 1.16
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.2.0
