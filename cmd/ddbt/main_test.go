@@ -5,11 +5,9 @@ import (
 	"context"
 	"ddbt/internal"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -22,16 +20,16 @@ const (
 
 var testLogger = log.New(ioutil.Discard, "", 0)
 
-type batchWriteItemWithContextMock struct {
-	dynamodbiface.DynamoDBAPI
+type batchWriteItemMock struct {
+	DynamoDBAPI
 
 	output    []*dynamodb.BatchWriteItemOutput
 	error     error
 	callCount int
 }
 
-func (mock *batchWriteItemWithContextMock) BatchWriteItemWithContext(aws.Context, *dynamodb.BatchWriteItemInput, ...request.Option) (*dynamodb.BatchWriteItemOutput, error) {
-	defer func(mock *batchWriteItemWithContextMock) { mock.callCount++ }(mock)
+func (mock *batchWriteItemMock) BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error) {
+	defer func(mock *batchWriteItemMock) { mock.callCount++ }(mock)
 
 	if mock.output != nil {
 		return mock.output[mock.callCount], mock.error
@@ -43,7 +41,7 @@ func (mock *batchWriteItemWithContextMock) BatchWriteItemWithContext(aws.Context
 func Test_deleteBatch(t *testing.T) {
 	type args struct {
 		config configuration
-		items  []map[string]*dynamodb.AttributeValue
+		items  []map[string]types.AttributeValue
 	}
 	tests := []struct {
 		name          string
@@ -54,11 +52,11 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "ok",
 			args: args{
-				items: createRandomItems(25),
+				items: createRandomItems(t, 25),
 				config: configuration{
-					db: &batchWriteItemWithContextMock{
+					db: &batchWriteItemMock{
 						output: []*dynamodb.BatchWriteItemOutput{
-							{UnprocessedItems: map[string][]*dynamodb.WriteRequest{}},
+							{UnprocessedItems: map[string][]types.WriteRequest{}},
 						},
 					},
 					table:  tableName,
@@ -72,12 +70,12 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "unprocessed-items-1",
 			args: args{
-				items: createRandomItems(25),
+				items: createRandomItems(t,25),
 				config: configuration{
-					db: &batchWriteItemWithContextMock{
+					db: &batchWriteItemMock{
 						output: []*dynamodb.BatchWriteItemOutput{
-							{UnprocessedItems: createRandomUnprocessedItems(tableName, 12)},
-							{UnprocessedItems: map[string][]*dynamodb.WriteRequest{}},
+							{UnprocessedItems: createRandomUnprocessedItems(t, tableName, 12)},
+							{UnprocessedItems: map[string][]types.WriteRequest{}},
 						},
 					},
 					table:  tableName,
@@ -91,13 +89,13 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "unprocessed-items-2",
 			args: args{
-				items: createRandomItems(25),
+				items: createRandomItems(t,25),
 				config: configuration{
-					db: &batchWriteItemWithContextMock{
+					db: &batchWriteItemMock{
 						output: []*dynamodb.BatchWriteItemOutput{
-							{UnprocessedItems: createRandomUnprocessedItems(tableName, 12)},
-							{UnprocessedItems: createRandomUnprocessedItems(tableName, 5)},
-							{UnprocessedItems: map[string][]*dynamodb.WriteRequest{}},
+							{UnprocessedItems: createRandomUnprocessedItems(t, tableName, 12)},
+							{UnprocessedItems: createRandomUnprocessedItems(t, tableName, 5)},
+							{UnprocessedItems: map[string][]types.WriteRequest{}},
 						},
 					},
 					table:  tableName,
@@ -111,9 +109,9 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "delete-request-fails",
 			args: args{
-				items: createRandomItems(25),
+				items: createRandomItems(t,25),
 				config: configuration{
-					db: &batchWriteItemWithContextMock{
+					db: &batchWriteItemMock{
 						output: nil,
 						error:  fmt.Errorf("unit test error: %s", "delete-request-fails"),
 					},
@@ -132,7 +130,7 @@ func Test_deleteBatch(t *testing.T) {
 				t.Errorf("deleteBatch() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			gotCallCount := tt.args.config.db.(*batchWriteItemWithContextMock).callCount
+			gotCallCount := tt.args.config.db.(*batchWriteItemMock).callCount
 			if gotCallCount != tt.wantCallCount {
 				t.Errorf("deleteBatch() callCount = %d, wantCallCount: %d", gotCallCount, tt.wantCallCount)
 			}
@@ -140,39 +138,41 @@ func Test_deleteBatch(t *testing.T) {
 	}
 }
 
-func createRandomItems(count int) []map[string]*dynamodb.AttributeValue {
-	var items []map[string]*dynamodb.AttributeValue
+func createRandomItems(t *testing.T, count int) []map[string]types.AttributeValue {
+	t.Helper()
+
+	var items []map[string]types.AttributeValue
 
 	for i := 0; i < count; i++ {
-		items = append(items, map[string]*dynamodb.AttributeValue{
-			hashKeyName: {S: aws.String(internal.RandomString(12))},
+		items = append(items, map[string]types.AttributeValue{
+			hashKeyName: &types.AttributeValueMemberS{Value: internal.RandomString(12)},
 		})
 	}
 
 	return items
 }
 
-func createRandomUnprocessedItems(table string, count int) map[string][]*dynamodb.WriteRequest {
-	var items []*dynamodb.WriteRequest
+func createRandomUnprocessedItems(t *testing.T, table string, count int) map[string][]types.WriteRequest {
+	t.Helper()
+
+	var items []types.WriteRequest
 
 	for i := 0; i < count; i++ {
-		items = append(items, &dynamodb.WriteRequest{
-			DeleteRequest: &dynamodb.DeleteRequest{
-				Key: map[string]*dynamodb.AttributeValue{
-					hashKeyName: {
-						S: aws.String(internal.RandomString(12)),
-					},
+		items = append(items, types.WriteRequest{
+			DeleteRequest: &types.DeleteRequest{
+				Key: map[string]types.AttributeValue{
+					hashKeyName: &types.AttributeValueMemberS{Value: internal.RandomString(12)},
 				},
 			},
 		})
 	}
 
-	return map[string][]*dynamodb.WriteRequest{table: items}
+	return map[string][]types.WriteRequest{table: items}
 }
 
 func Test_newProjection(t *testing.T) {
 	type args struct {
-		keys []*dynamodb.KeySchemaElement
+		keys []types.KeySchemaElement
 	}
 	tests := []struct {
 		name    string
@@ -183,8 +183,8 @@ func Test_newProjection(t *testing.T) {
 		{
 			name: "one-key",
 			args: args{
-				keys: []*dynamodb.KeySchemaElement{
-					{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
+				keys: []types.KeySchemaElement{
+					{AttributeName: aws.String("uuid"), KeyType: types.KeyTypeHash},
 				},
 			},
 			want:    []string{"uuid"},
@@ -193,9 +193,9 @@ func Test_newProjection(t *testing.T) {
 		{
 			name: "two-keys",
 			args: args{
-				keys: []*dynamodb.KeySchemaElement{
-					{AttributeName: aws.String("uuid"), KeyType: aws.String("S")},
-					{AttributeName: aws.String("created"), KeyType: aws.String("S")},
+				keys: []types.KeySchemaElement{
+					{AttributeName: aws.String("uuid"), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String("created"), KeyType: types.KeyTypeRange},
 				},
 			},
 			want:    []string{"uuid", "created"},
@@ -204,8 +204,8 @@ func Test_newProjection(t *testing.T) {
 		{
 			name: "err",
 			args: args{
-				keys: []*dynamodb.KeySchemaElement{
-					{AttributeName: aws.String(""), KeyType: aws.String("")},
+				keys: []types.KeySchemaElement{
+					{AttributeName: aws.String(""), KeyType: ""},
 				},
 			},
 			wantErr: true,
@@ -232,76 +232,12 @@ func Test_newProjection(t *testing.T) {
 			for _, wantName := range tt.want {
 				ok := false
 				for _, gotName := range got.Names() {
-					if *gotName == wantName {
+					if gotName == wantName {
 						ok = true
 					}
 				}
 				if !ok {
 					t.Errorf("newProjection() does not contain key name '%s'", wantName)
-					return
-				}
-			}
-		})
-	}
-}
-
-func Test_newConfig(t *testing.T) {
-	type args struct {
-		args arguments
-	}
-	tests := []struct {
-		name         string
-		args         args
-		wantTable    string
-		wantRegion   string
-		wantEndpoint string
-		wantErr      bool
-	}{
-		{
-			name:       "region-set",
-			args:       args{args: arguments{region: "test-region"}},
-			wantRegion: "test-region",
-			wantErr:    false,
-		},
-		{
-			name:         "endpoint-set",
-			args:         args{args: arguments{endpoint: "http://localhost:8000"}},
-			wantEndpoint: "http://localhost:8000",
-			wantErr:      false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := newConfig(tt.args.args)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("newConfig() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantRegion != "" {
-				gotRegion := *got.db.(*dynamodb.DynamoDB).Config.Region
-				if gotRegion != tt.wantRegion {
-					t.Errorf("newConfig() region = %s, wantRegion = %s", gotRegion, tt.wantRegion)
-					return
-				}
-			}
-
-			if tt.wantTable != "" {
-				if got.table != tt.wantTable {
-					t.Errorf("newConfig() table = %s, wantTable = %s", got.table, tt.wantTable)
-					return
-				}
-			}
-
-			if tt.wantEndpoint != "" {
-				gotEndpoint, err := got.db.(*dynamodb.DynamoDB).Config.EndpointResolver.EndpointFor(endpoints.DynamodbServiceID, "us-east-1")
-				if err != nil {
-					t.Errorf("newConfig() endpoint = err: %s", err.Error())
-					return
-				}
-
-				if gotEndpoint.URL != tt.wantEndpoint {
-					t.Errorf("newConfig() endpoint = %s, wantEndpoint = %s", gotEndpoint.URL, tt.wantEndpoint)
 					return
 				}
 			}
@@ -325,7 +261,7 @@ func Test_askForConfirmation(t *testing.T) {
 	}
 
 	tableInfo := &dynamodb.DescribeTableOutput{
-		Table: &dynamodb.TableDescription{TableArn: aws.String("test"), ItemCount: aws.Int64(1337)},
+		Table: &types.TableDescription{TableArn: aws.String("test"), ItemCount: 1337},
 	}
 
 	for _, tt := range tests {
