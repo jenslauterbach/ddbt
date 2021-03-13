@@ -468,6 +468,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 			ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
 		}
 
+		unprocessed = map[string][]types.WriteRequest{}
 		if !config.dryRun {
 			output, err := config.db.BatchWriteItem(ctx, params)
 			if err != nil {
@@ -479,8 +480,6 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 			}
 
 			unprocessed = output.UnprocessedItems
-		} else {
-			unprocessed = map[string][]types.WriteRequest{}
 		}
 
 		processed = bSize - processed - uint64(len(unprocessed))
