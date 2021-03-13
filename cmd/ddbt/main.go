@@ -97,7 +97,7 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.dryRun {
-		pterm.Info.Println("Performing dry run")
+		pterm.Info.Println("Performing dry run. No data will be deleted.")
 	}
 
 	if parsedArguments.debug {
@@ -463,26 +463,31 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 
 	unprocessed := map[string][]types.WriteRequest{config.table: requests}
 	for ok := true; ok; ok = len(unprocessed) > 0 {
+		// The dry run should be handle as late as possible to allow as much as possible "real" output to happen before
+		// the processing stops. Therefore, the dry run is handled here, right before the call to 'BatchWriteItem' is
+		// done and statistics are updated.
+		if config.dryRun {
+			unprocessed = map[string][]types.WriteRequest{}
+			continue
+		}
+
 		params := &dynamodb.BatchWriteItemInput{
 			RequestItems:           unprocessed,
 			ReturnConsumedCapacity: types.ReturnConsumedCapacityTotal,
 		}
 
-		unprocessed = map[string][]types.WriteRequest{}
-		if !config.dryRun {
-			output, err := config.db.BatchWriteItem(ctx, params)
-			if err != nil {
-				return fmt.Errorf("unable to send delete requests: %w", err)
-			}
-
-			for _, u := range output.ConsumedCapacity {
-				config.stats.addWCU(*u.CapacityUnits)
-			}
-
-			unprocessed = output.UnprocessedItems
-			processed = bSize - processed - uint64(len(unprocessed))
-			config.stats.increaseDeleted(processed)
+		output, err := config.db.BatchWriteItem(ctx, params)
+		if err != nil {
+			return fmt.Errorf("unable to send delete requests: %w", err)
 		}
+
+		for _, u := range output.ConsumedCapacity {
+			config.stats.addWCU(*u.CapacityUnits)
+		}
+
+		unprocessed = output.UnprocessedItems
+		processed = bSize - processed - uint64(len(unprocessed))
+		config.stats.increaseDeleted(processed)
 	}
 
 	return nil
