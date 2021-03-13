@@ -207,15 +207,13 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		return arguments{}, err
 	}
 
-	var table string
+	table := flags.Arg(0)
 	if isInputFromPipe() {
 		b, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
 			return arguments{}, errReadPipe
 		}
 		table = string(b)
-	} else {
-		table = flags.Arg(0)
 	}
 
 	return arguments{
