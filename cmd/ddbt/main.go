@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/pterm/pterm"
+	"strconv"
 
 	"golang.org/x/sync/errgroup"
 	"io"
@@ -19,7 +21,6 @@ import (
 	"log"
 	"os"
 	"sync"
-	"text/tabwriter"
 	"time"
 )
 
@@ -65,7 +66,7 @@ var (
 func main() {
 	err := run(os.Args[1:])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n\n%s", err.Error(), usage)
+		pterm.Printf("error: %s\n\n%s", err.Error(), usage)
 		os.Exit(1)
 	}
 }
@@ -79,12 +80,12 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.help {
-		fmt.Fprintf(os.Stdout, "%s", usage)
+		pterm.Printf("%s", usage)
 		return nil
 	}
 
 	if parsedArguments.version {
-		fmt.Fprintf(os.Stdout, "ddbt %s (built at %s)\n", version, date)
+		pterm.Printf("ddbt %s (built at %s)\n", version, date)
 		return nil
 	}
 
@@ -93,7 +94,7 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.dryRun {
-		fmt.Fprintf(os.Stdout, "Performing dry run\n")
+		pterm.Printf("Performing dry run\n")
 	}
 
 	conf, err := newConfig(parsedArguments)
@@ -129,7 +130,7 @@ func askForConfirmation(config configuration, reader io.RuneReader, tableInfo *d
 
 	input, _, err := reader.ReadRune()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Unable to read your input. Aborting truncate operation. For more detail run with --debug.")
+		pterm.Println("Unable to read your input. Aborting truncate operation. For more detail run with --debug.")
 		config.logger.Printf("error: %v\n", err.Error())
 		return false
 	}
@@ -138,22 +139,23 @@ func askForConfirmation(config configuration, reader io.RuneReader, tableInfo *d
 	case 'Y':
 		return true
 	case 'n':
-		fmt.Fprintln(os.Stderr, "You selected 'n'. Aborting truncate operation.")
+		pterm.Println("You selected 'n'. Aborting truncate operation.")
 		return false
 	default:
-		fmt.Fprintln(os.Stderr, "Neither 'Y' nor 'n' selected. Aborting truncate operation.")
+		pterm.Println("Neither 'Y' nor 'n' selected. Aborting truncate operation.")
 		return false
 	}
 }
 
 func printStatistics(stats *statistics, start time.Time) {
-	fmt.Printf("\nStatistics:\n\n")
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-	fmt.Fprintf(w, "Deleted items:\t%d\n", stats.deleted)
-	fmt.Fprintf(w, "Duration:\t%v\n", time.Since(start))
-	fmt.Fprintf(w, "Consumed Read Capacity Units:\t%v\n", stats.rcu)
-	fmt.Fprintf(w, "Consumed Write Capacity Units:\t%v\n", stats.wcu)
-	w.Flush()
+	pterm.DefaultSection.Println("Statistics")
+
+	pterm.DefaultTable.WithData(pterm.TableData{
+		{"Deleted items:", strconv.FormatUint(stats.deleted, 10)},
+		{"Duration:", time.Since(start).String()},
+		{"Consumed Read Capacity Units:", strconv.FormatFloat(stats.rcu, 'f', 6, 64)},
+		{"Consumed Write Capacity Units:", strconv.FormatFloat(stats.wcu, 'f', 6, 64)},
+	}).Render()
 }
 
 type arguments struct {
@@ -333,7 +335,7 @@ func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutp
 }
 
 func truncateTable(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput) error {
-	fmt.Fprintf(os.Stdout, "Truncating table %s\n", *tableInfo.Table.TableArn)
+	pterm.Printf("Truncating table %s\n", *tableInfo.Table.TableArn)
 
 	g, ctx := errgroup.WithContext(ctx)
 
