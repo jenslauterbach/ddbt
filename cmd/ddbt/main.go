@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/pterm/pterm"
+	"strconv"
 
 	"golang.org/x/sync/errgroup"
 	"io"
@@ -19,7 +21,6 @@ import (
 	"log"
 	"os"
 	"sync"
-	"text/tabwriter"
 	"time"
 )
 
@@ -65,7 +66,8 @@ var (
 func main() {
 	err := run(os.Args[1:])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s\n\n%s", err.Error(), usage)
+		pterm.Error.Printf("%s\n\n", err.Error())
+		pterm.Printf("%s", usage)
 		os.Exit(1)
 	}
 }
@@ -79,12 +81,13 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.help {
-		fmt.Fprintf(os.Stdout, "%s", usage)
+		pterm.Printf("%s", usage)
 		return nil
 	}
 
 	if parsedArguments.version {
-		fmt.Fprintf(os.Stdout, "ddbt %s (built at %s)\n", version, date)
+		// Version information should be printed as plain text to make scripting easier.
+		pterm.Printf("ddbt %s (built at %s)\n", version, date)
 		return nil
 	}
 
@@ -93,7 +96,11 @@ func run(args []string) error {
 	}
 
 	if parsedArguments.dryRun {
-		fmt.Fprintf(os.Stdout, "Performing dry run\n")
+		pterm.Info.Println("Performing dry run")
+	}
+
+	if parsedArguments.debug {
+		pterm.EnableDebugMessages()
 	}
 
 	conf, err := newConfig(parsedArguments)
@@ -108,7 +115,7 @@ func run(args []string) error {
 
 	if !parsedArguments.noInput {
 		reader := bufio.NewReader(os.Stdin)
-		ok := askForConfirmation(conf, reader, tableInfo)
+		ok := askForConfirmation(reader, tableInfo)
 		if !ok {
 			return nil
 		}
@@ -124,13 +131,13 @@ func run(args []string) error {
 	return nil
 }
 
-func askForConfirmation(config configuration, reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput) bool {
-	fmt.Printf("Do you really want to delete approximatelly %d items from table %s? [Y/n] ", tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
+func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput) bool {
+	pterm.Warning.Printf("Do you really want to delete approximately %d items from table %s? [Y/n] ", tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
 
 	input, _, err := reader.ReadRune()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Unable to read your input. Aborting truncate operation. For more detail run with --debug.")
-		config.logger.Printf("error: %v\n", err.Error())
+		pterm.Println("Unable to read your input. Aborting truncate operation. For more detail run with --debug.")
+		pterm.Debug.Printf("error: %v\n", err.Error())
 		return false
 	}
 
@@ -138,22 +145,26 @@ func askForConfirmation(config configuration, reader io.RuneReader, tableInfo *d
 	case 'Y':
 		return true
 	case 'n':
-		fmt.Fprintln(os.Stderr, "You selected 'n'. Aborting truncate operation.")
+		pterm.Println("You selected 'n'. Aborting truncate operation.")
 		return false
 	default:
-		fmt.Fprintln(os.Stderr, "Neither 'Y' nor 'n' selected. Aborting truncate operation.")
+		pterm.Println("Neither 'Y' nor 'n' selected. Aborting truncate operation.")
 		return false
 	}
 }
 
 func printStatistics(stats *statistics, start time.Time) {
-	fmt.Printf("\nStatistics:\n\n")
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-	fmt.Fprintf(w, "Deleted items:\t%d\n", stats.deleted)
-	fmt.Fprintf(w, "Duration:\t%v\n", time.Since(start))
-	fmt.Fprintf(w, "Consumed Read Capacity Units:\t%v\n", stats.rcu)
-	fmt.Fprintf(w, "Consumed Write Capacity Units:\t%v\n", stats.wcu)
-	w.Flush()
+	pterm.DefaultSection.Println("Statistics")
+
+	err := pterm.DefaultTable.WithData(pterm.TableData{
+		{"Deleted items:", strconv.FormatUint(stats.deleted, 10)},
+		{"Duration:", time.Since(start).String()},
+		{"Consumed Read Capacity Units:", strconv.FormatFloat(stats.rcu, 'f', 6, 64)},
+		{"Consumed Write Capacity Units:", strconv.FormatFloat(stats.wcu, 'f', 6, 64)},
+	}).Render()
+	if err != nil {
+		pterm.Error.Printf("Unable to print statistics table: %v\n", err)
+	}
 }
 
 type arguments struct {
@@ -260,15 +271,9 @@ func (s *statistics) addWCU(n float64) {
 func newConfig(args arguments) (configuration, error) {
 	awsConfig := newAwsConfig(args)
 
-	var logOutput = ioutil.Discard
-	if args.debug {
-		logOutput = os.Stdout
-	}
-
 	return configuration{
 		table:  args.table,
 		db:     dynamodb.NewFromConfig(awsConfig),
-		logger: log.New(logOutput, "debug: ", log.Ldate|log.Ltime|log.Lmicroseconds),
 		dryRun: args.dryRun,
 		stats:  &statistics{},
 	}, nil
@@ -316,30 +321,30 @@ func newAwsConfig(args arguments) aws.Config {
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
-	config.logger.Printf("retrieving table information for table %s\n", config.table)
+	pterm.Debug.Printf("retrieving table information for table %s\n", config.table)
 
 	params := &dynamodb.DescribeTableInput{
 		TableName: aws.String(config.table),
 	}
-	config.logger.Printf("DescribeTableInput: %v\n", params)
+	pterm.Debug.Printf("DescribeTableInput: %v\n", params)
 
 	output, err := config.db.DescribeTable(context.TODO(), params)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table information for table %s: %w", config.table, err)
 	}
-	config.logger.Printf("DescribeTableOutput: %v\n", *output)
+	pterm.Debug.Printf("DescribeTableOutput: %v\n", *output)
 
 	return output, nil
 }
 
 func truncateTable(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput) error {
-	fmt.Fprintf(os.Stdout, "Truncating table %s\n", *tableInfo.Table.TableArn)
+	pterm.Info.Printf("Truncating table %s\n", *tableInfo.Table.TableArn)
 
 	g, ctx := errgroup.WithContext(ctx)
 
 	segments := 4
 	for segment := 0; segment < segments; segment++ {
-		config.logger.Printf("start segment %d of %d\n", segment, segments)
+		pterm.Debug.Printf("start segment %d of %d\n", segment, segments)
 
 		total := segments
 		current := segment
@@ -353,11 +358,13 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 		return err
 	}
 
+	pterm.Success.Printf("Truncated table %s\n", *tableInfo.Table.TableArn)
+
 	return nil
 }
 
 func processSegment(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, g *errgroup.Group) error {
-	config.logger.Printf("start processing segment %d\n", segment)
+	pterm.Debug.Printf("start processing segment %d\n", segment)
 
 	expr, err := newProjection(tableInfo.Table.KeySchema)
 	if err != nil {
@@ -372,7 +379,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		Segment:                  aws.Int32(int32(segment)),
 		ReturnConsumedCapacity:   types.ReturnConsumedCapacityTotal,
 	}
-	config.logger.Printf("ScanInput: %v\n", params)
+	pterm.Debug.Printf("ScanInput: %v\n", params)
 
 	paginator := dynamodb.NewScanPaginator(config.db, params)
 
@@ -390,7 +397,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		})
 	}
 
-	config.logger.Printf("finish processing segment %d\n", segment)
+	pterm.Debug.Printf("finish processing segment %d\n", segment)
 	return nil
 }
 
