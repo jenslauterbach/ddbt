@@ -461,6 +461,10 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 		}
 	}
 
+	// TODO: This is a potential endless loop. There should be a "circuit breaker" if the loop iterates too often.
+	// Process the list of 'unprocessed' items until there are no unprocessed items left. There might be circumstances
+	// when only a subset of items can be processed with a single 'BatchWriteItem' request. So this is a basic "retry"
+	// strategy, which is distinct from the API retry strategy, which takes place when there are HTTP errors etc.
 	unprocessed := map[string][]types.WriteRequest{config.table: requests}
 	for ok := true; ok; ok = len(unprocessed) > 0 {
 		// The dry run should be handle as late as possible to allow as much as possible "real" output to happen before
