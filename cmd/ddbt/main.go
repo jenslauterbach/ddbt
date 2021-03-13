@@ -156,12 +156,15 @@ func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableO
 func printStatistics(stats *statistics, start time.Time) {
 	pterm.DefaultSection.Println("Statistics")
 
-	pterm.DefaultTable.WithData(pterm.TableData{
+	err := pterm.DefaultTable.WithData(pterm.TableData{
 		{"Deleted items:", strconv.FormatUint(stats.deleted, 10)},
 		{"Duration:", time.Since(start).String()},
 		{"Consumed Read Capacity Units:", strconv.FormatFloat(stats.rcu, 'f', 6, 64)},
 		{"Consumed Write Capacity Units:", strconv.FormatFloat(stats.wcu, 'f', 6, 64)},
 	}).Render()
+	if err != nil {
+		pterm.Error.Printf("Unable to print statistics table: %v\n", err)
+	}
 }
 
 type arguments struct {
