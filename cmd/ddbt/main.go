@@ -353,7 +353,7 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 	// processing of those segments. Each segment itself will process a chunk of the table in so called pages. This
 	// will create some parallelism. To stop processing if an error occurs in any of the segments, a "errgroup" is used.
 	// An error in one Go routine will cancel all the other Go routines.
-	g, ctx := errgroup.WithContext(ctx)
+	group, ctx := errgroup.WithContext(ctx)
 
 	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("Truncating table %s", *tableInfo.Table.TableArn))
 	if err != nil {
@@ -366,12 +366,12 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 
 		total := segments
 		current := segment
-		g.Go(func() error {
-			return processSegment(ctx, config, tableInfo, total, current, g)
+		group.Go(func() error {
+			return processSegment(ctx, config, tableInfo, total, current, group)
 		})
 	}
 
-	err = g.Wait()
+	err = group.Wait()
 	if err != nil {
 		return err
 	}
