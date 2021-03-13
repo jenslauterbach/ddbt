@@ -480,10 +480,9 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 			}
 
 			unprocessed = output.UnprocessedItems
+			processed = bSize - processed - uint64(len(unprocessed))
+			config.stats.increaseDeleted(processed)
 		}
-
-		processed = bSize - processed - uint64(len(unprocessed))
-		config.stats.increaseDeleted(processed)
 	}
 
 	return nil
