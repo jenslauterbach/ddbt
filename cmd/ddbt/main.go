@@ -451,15 +451,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 	batchSize := uint64(len(items))
 	var processed uint64
 
-	requests := make([]types.WriteRequest, batchSize)
-
-	for index, key := range items {
-		requests[index] = types.WriteRequest{
-			DeleteRequest: &types.DeleteRequest{
-				Key: key,
-			},
-		}
-	}
+	requests := newDeleteRequests(items)
 
 	// TODO: This is a potential endless loop. There should be a "circuit breaker" if the loop iterates too often.
 	// Process the list of 'unprocessed' items until there are no unprocessed items left. There might be circumstances
@@ -467,7 +459,7 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 	// strategy, which is distinct from the API retry strategy, which takes place when there are HTTP errors etc.
 	unprocessed := map[string][]types.WriteRequest{config.table: requests}
 	for ok := true; ok; ok = len(unprocessed) > 0 {
-		// The dry run should be handle as late as possible to allow as much as possible "real" output to happen before
+		// The dry run should be handled as late as possible to allow as much as possible "real" output to happen before
 		// the processing stops. Therefore, the dry run is handled here, right before the call to 'BatchWriteItem' is
 		// done and statistics are updated.
 		if config.dryRun {
@@ -495,6 +487,22 @@ func deleteBatch(ctx context.Context, config configuration, items []map[string]t
 	}
 
 	return nil
+}
+
+// newDeleteRequests creates delete requests from the given DynamoDB items (keys) which then can be used with the
+// DynamoDB clients 'BatchWriteItem' method.
+func newDeleteRequests(items []map[string]types.AttributeValue) []types.WriteRequest {
+	requests := make([]types.WriteRequest, len(items))
+
+	for index, key := range items {
+		requests[index] = types.WriteRequest{
+			DeleteRequest: &types.DeleteRequest{
+				Key: key,
+			},
+		}
+	}
+
+	return requests
 }
 
 type DynamoDBAPI interface {
