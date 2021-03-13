@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -331,18 +332,18 @@ func newAwsConfig(args arguments) aws.Config {
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
-	pterm.Debug.Printf("retrieving table information for table %s\n", config.table)
+	pterm.Debug.Printf("Retrieving table information for table %s\n", config.table)
 
 	params := &dynamodb.DescribeTableInput{
 		TableName: aws.String(config.table),
 	}
-	pterm.Debug.Printf("DescribeTableInput: %v\n", params)
+	pterm.Debug.Printf("DescribeTableInput: %v\n", prettify(*params))
 
 	output, err := config.db.DescribeTable(context.TODO(), params)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table information for table %s: %w", config.table, err)
 	}
-	pterm.Debug.Printf("DescribeTableOutput: %v\n", *output)
+	pterm.Debug.Printf("DescribeTableOutput: %v\n", prettify(*output))
 
 	return output, nil
 }
@@ -354,7 +355,7 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 
 	segments := 4
 	for segment := 0; segment < segments; segment++ {
-		pterm.Debug.Printf("start segment %d of %d\n", segment, segments)
+		pterm.Debug.Printf("Start segment %d of %d\n", segment, segments)
 
 		total := segments
 		current := segment
@@ -374,7 +375,7 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 }
 
 func processSegment(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, g *errgroup.Group) error {
-	pterm.Debug.Printf("start processing segment %d\n", segment)
+	pterm.Debug.Printf("Start processing segment %d\n", segment)
 
 	expr, err := newProjection(tableInfo.Table.KeySchema)
 	if err != nil {
@@ -389,7 +390,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		Segment:                  aws.Int32(int32(segment)),
 		ReturnConsumedCapacity:   types.ReturnConsumedCapacityTotal,
 	}
-	pterm.Debug.Printf("ScanInput: %v\n", params)
+	pterm.Debug.Printf("ScanInput: %v\n", prettify(*params))
 
 	paginator := dynamodb.NewScanPaginator(config.db, params)
 
@@ -407,7 +408,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 		})
 	}
 
-	pterm.Debug.Printf("finish processing segment %d\n", segment)
+	pterm.Debug.Printf("Finish processing segment %d\n", segment)
 	return nil
 }
 
@@ -509,4 +510,13 @@ type DynamoDBAPI interface {
 	BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
 	DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error)
 	Scan(context.Context, *dynamodb.ScanInput, ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+}
+
+func prettify(o interface{}) string {
+	data, err := json.Marshal(o)
+	if err != nil {
+		pterm.Error.Printf("%v\n", err)
+		return ""
+	}
+	return string(data)
 }
