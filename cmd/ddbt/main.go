@@ -75,6 +75,10 @@ func run(args []string) error {
 		return err
 	}
 
+	if disableColor(parsedArguments.disableColor, os.Environ()) {
+		pterm.DisableColor()
+	}
+
 	if parsedArguments.help {
 		pterm.Printf("%s", usage)
 		return nil
