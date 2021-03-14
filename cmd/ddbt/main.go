@@ -8,20 +8,13 @@ import (
 	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/pterm/pterm"
-	"strconv"
-
 	"golang.org/x/sync/errgroup"
 	"io"
-	"io/ioutil"
-	"log"
 	"os"
-	"sync"
 	"time"
 )
 
@@ -121,7 +114,7 @@ func run(args []string) error {
 
 	if !parsedArguments.noInput {
 		reader := bufio.NewReader(os.Stdin)
-		ok := askForConfirmation(reader, tableInfo)
+		ok := askForConfirmation(reader, tableInfo, parsedArguments.quiet)
 		if !ok {
 			return nil
 		}
@@ -137,12 +130,14 @@ func run(args []string) error {
 	return nil
 }
 
-func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput) bool {
+func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput, quiet bool) bool {
 	// Explicitly enable output before showing the question. The user might have used the --quiet flag. If that is the
 	// case the output would not be enabled, the question would not be shown.
 	pterm.EnableOutput()
 	pterm.Warning.Printf("Do you really want to delete approximately %d items from table %s? [Y/n] ", tableInfo.Table.ItemCount, *tableInfo.Table.TableArn)
-	pterm.DisableOutput()
+	if quiet {
+		pterm.DisableOutput()
+	}
 
 	input, _, err := reader.ReadRune()
 	if err != nil {
@@ -161,174 +156,6 @@ func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableO
 		pterm.Println("Neither 'Y' nor 'n' selected. Aborting truncate operation.")
 		return false
 	}
-}
-
-func printStatistics(stats *statistics, start time.Time) {
-	pterm.DefaultSection.Println("Statistics")
-
-	err := pterm.DefaultTable.WithData(pterm.TableData{
-		{"Deleted items:", strconv.FormatUint(stats.deleted, 10)},
-		{"Duration:", time.Since(start).String()},
-		{"Consumed Read Capacity Units:", strconv.FormatFloat(stats.rcu, 'f', 6, 64)},
-		{"Consumed Write Capacity Units:", strconv.FormatFloat(stats.wcu, 'f', 6, 64)},
-	}).Render()
-	if err != nil {
-		pterm.Error.Printf("Unable to print statistics table: %v\n", err)
-	}
-}
-
-type arguments struct {
-	region   string
-	profile  string
-	endpoint string
-	table    string
-	retries  int
-	debug    bool
-	help     bool
-	version  bool
-	dryRun   bool
-	noInput  bool
-	quiet    bool
-}
-
-func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
-	region := flags.String("region", "", "AWS region to use")
-	profile := flags.String("profile", "", "AWS profile to use")
-	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
-	retries := flags.Int("max-retries", defaultMaxRetries, fmt.Sprintf("maximum number of retries (default: %d)", defaultMaxRetries))
-	debug := flags.Bool("debug", false, "show debug information")
-	help := flags.Bool("help", false, "show help text")
-	version := flags.Bool("version", false, "show version")
-	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
-	noInput := flags.Bool("no-input", false, "Do not require any input")
-	quiet := flags.Bool("quiet", false, "Disable all output (except for required input)")
-
-	err := flags.Parse(args)
-	if err != nil {
-		return arguments{}, err
-	}
-
-	table := flags.Arg(0)
-	if isInputFromPipe() {
-		b, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			return arguments{}, errReadPipe
-		}
-		table = string(b)
-	}
-
-	return arguments{
-		region:   *region,
-		profile:  *profile,
-		endpoint: *endpoint,
-		table:    table,
-		retries:  *retries,
-		debug:    *debug,
-		help:     *help,
-		version:  *version,
-		dryRun:   *dry,
-		noInput:  *noInput,
-		quiet:    *quiet,
-	}, nil
-}
-
-func isInputFromPipe() bool {
-	fileInfo, _ := os.Stdin.Stat()
-	return fileInfo.Mode()&os.ModeCharDevice == 0
-}
-
-type configuration struct {
-	// table is the name of the DynamoDB table to be truncated
-	table string
-	// db is the client used to interact with DynamoDB
-	db DynamoDBAPI
-	// log is used to output debug information
-	logger *log.Logger
-	// dryRun allows running the program without actually deleting items from DynamoDB
-	dryRun bool
-	// stats keeps track of deleted of important statistics related to the process of truncating the table, like number
-	// of deleted or failed items or how much capacity was consumed.
-	stats *statistics
-}
-
-type statistics struct {
-	mu sync.Mutex
-	// deleted number of items
-	deleted uint64
-	// rcu is the number of consumed read capacity units
-	rcu float64
-	// wcu is the number of consumed write capacity units
-	wcu float64
-}
-
-func (s *statistics) increaseDeleted(n uint64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.deleted += n
-}
-
-func (s *statistics) addRCU(n float64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.rcu += n
-}
-
-func (s *statistics) addWCU(n float64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.wcu += n
-}
-
-func newConfig(args arguments) (configuration, error) {
-	awsConfig := newAwsConfig(args)
-
-	return configuration{
-		table:  args.table,
-		db:     dynamodb.NewFromConfig(awsConfig),
-		dryRun: args.dryRun,
-		stats:  &statistics{},
-	}, nil
-}
-
-// newAwsConfig returns a AWS configuration based on the options the user selected on the command line.
-func newAwsConfig(args arguments) aws.Config {
-	// The options array will be updated within this function based on the provided command line arguments. At the end
-	// the array will be passed to 'LoadDefaultConfig()' to create a AWS configuration for the DynamoDB client that
-	// reflects the options the user has selected on the command line.
-	var options []func(*config.LoadOptions) error
-
-	if args.region != "" {
-		options = append(options, config.WithRegion(args.region))
-	}
-
-	if args.profile != "" {
-		options = append(options, config.WithSharedConfigProfile(args.profile))
-	}
-
-	options = append(options, config.WithRetryer(func() aws.Retryer {
-		return retry.AddWithMaxAttempts(retry.NewStandard(), 5)
-	}))
-
-	if args.endpoint != "" {
-		resolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-			if service == dynamodb.ServiceID {
-				return aws.Endpoint{
-					PartitionID:   "aws",
-					URL:           args.endpoint,
-					SigningRegion: region,
-				}, nil
-			}
-
-			return aws.Endpoint{}, fmt.Errorf("unknown endpoint requested")
-		})
-
-		options = append(options, config.WithEndpointResolver(resolver))
-	}
-
-	// TODO: handle error.
-	cfg, _ := config.LoadDefaultConfig(context.TODO(), options...)
-
-	return cfg
 }
 
 func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
@@ -522,7 +349,7 @@ type DynamoDBAPI interface {
 func prettify(o interface{}) string {
 	data, err := json.Marshal(o)
 	if err != nil {
-		pterm.Error.Printf("%v\n", err)
+		pterm.Error.Println(err)
 		return ""
 	}
 	return string(data)
