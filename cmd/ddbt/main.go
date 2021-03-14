@@ -150,10 +150,10 @@ func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableO
 	case 'Y':
 		return true
 	case 'n':
-		pterm.Println("You selected 'n'. Aborting truncate operation.")
+		pterm.Info.Println("You selected 'n'. Aborting truncate operation.")
 		return false
 	default:
-		pterm.Println("Neither 'Y' nor 'n' selected. Aborting truncate operation.")
+		pterm.Info.Println("Neither 'Y' nor 'n' selected. Aborting truncate operation.")
 		return false
 	}
 }
