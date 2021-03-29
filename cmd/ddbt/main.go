@@ -61,7 +61,7 @@ var (
 func main() {
 	err := run(os.Args[1:])
 	if err != nil {
-		pterm.Error.Printf("%s\n\n", err.Error())
+		pterm.Error.WithShowLineNumber(false).Printf("%s\n\n", err.Error())
 		pterm.Printf("%s", usage)
 		os.Exit(1)
 	}
@@ -235,7 +235,7 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			pterm.Error.Printf("Unable to get next page. Continuing with next page. Cause: %v\n", err)
+			pterm.Error.WithShowLineNumber(false).Printf("Unable to get next page. Continuing with next page. Cause: %v\n", err)
 			continue
 		}
 
@@ -353,7 +353,7 @@ type DynamoDBAPI interface {
 func prettify(o interface{}) string {
 	data, err := json.Marshal(o)
 	if err != nil {
-		pterm.Error.Println(err)
+		pterm.Error.WithShowLineNumber(false).Println(err)
 		return ""
 	}
 	return string(data)
