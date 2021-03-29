@@ -18,6 +18,7 @@
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Quick Start](#quick-start)
+- [Permissions](#permissions)
 - [Flags and Arguments](#flags-and-arguments)
 - [AWS Cost](#aws-cost)
 - [Design Goals](#design-goals)
@@ -92,6 +93,18 @@ ddbt --dry-run SomeTable
 ```shell script
 ddbt --region eu-central-1 SomeTable
 ```
+
+## Permissions
+[(Back to top)](#table-of-contents)
+
+The following table lists the IAM permissions a user needs to use `ddbt`.
+
+| Permission | Description |
+|:---|:---|
+|`dynamodb:DescribeTable`|Required to find out how many items (approximately) are in the table. This number is displayed, when the user is asked for confirmation. Furthermore, this operation is used to find out what the keys of the table are.|
+|`dynamodb:Scan`|Required to read all items in the table, to then delete them (using `BatchWriteItem`).|
+|`dynamodb:BatchWriteItem`|Required to delete items from the table.|
+
 
 ## AWS Cost
 [(Back to top)](#table-of-contents)
