@@ -43,6 +43,7 @@ Options:
   --help		This help text
   --max-retries		Maximum number of retries (default: 3)
   --no-input		Do not require any input
+  --no-color		Disable colored output
   --profile		AWS profile to use
   --quiet		Disable all output (except for required input)
   --region		AWS region of DynamoDB table (overwrite default region)
