@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"os"
+	"os/signal"
 	"time"
 )
 
@@ -59,7 +60,25 @@ var (
 )
 
 func main() {
-	err := run(os.Args[1:])
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	defer func() {
+		signal.Stop(signals)
+		cancel()
+	}()
+	go func() {
+		select {
+		case <-signals:
+			cancel()
+			os.Exit(0)
+		case <-ctx.Done():
+		}
+	}()
+
+	err := run(ctx, os.Args[1:])
 	if err != nil {
 		pterm.Error.Printf("%s\n\n", err.Error())
 		pterm.Printf("%s", usage)
@@ -67,7 +86,7 @@ func main() {
 	}
 }
 
-func run(args []string) error {
+func run(ctx context.Context, args []string) error {
 	start := time.Now()
 
 	parsedArguments, err := parseArguments(flag.CommandLine, args)
@@ -111,7 +130,7 @@ func run(args []string) error {
 		return err
 	}
 
-	tableInfo, err := retrieveTableInformation(conf)
+	tableInfo, err := retrieveTableInformation(ctx, conf)
 	if err != nil {
 		return err
 	}
@@ -126,7 +145,7 @@ func run(args []string) error {
 
 	defer printStatistics(conf.stats, start)
 
-	err = truncateTable(context.Background(), conf, tableInfo)
+	err = truncateTable(ctx, conf, tableInfo)
 	if err != nil {
 		return err
 	}
@@ -162,7 +181,7 @@ func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableO
 	}
 }
 
-func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutput, error) {
+func retrieveTableInformation(ctx context.Context, config configuration) (*dynamodb.DescribeTableOutput, error) {
 	pterm.Debug.Printf("Retrieving table information for table %s\n", config.table)
 
 	params := &dynamodb.DescribeTableInput{
@@ -170,7 +189,7 @@ func retrieveTableInformation(config configuration) (*dynamodb.DescribeTableOutp
 	}
 	pterm.Debug.Printf("DescribeTableInput: %v\n", prettify(*params))
 
-	output, err := config.db.DescribeTable(context.TODO(), params)
+	output, err := config.db.DescribeTable(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get table information for table %s: %w", config.table, err)
 	}
