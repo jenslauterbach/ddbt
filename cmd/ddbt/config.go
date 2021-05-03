@@ -122,7 +122,7 @@ func newAwsConfig(args arguments) (aws.Config, error) {
 	}
 
 	options = append(options, config.WithRetryer(func() aws.Retryer {
-		return retry.AddWithMaxAttempts(retry.NewStandard(), 5)
+		return retry.AddWithMaxAttempts(retry.NewStandard(), args.retries)
 	}))
 
 	if args.endpoint != "" {
