@@ -55,11 +55,11 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	retries := flags.Int("max-retries", defaultMaxRetries, fmt.Sprintf("maximum number of retries (default: %d)", defaultMaxRetries))
 	debug := flags.Bool("debug", false, "show debug information")
 	help := flags.Bool("help", false, "show help text")
-	version := flags.Bool("version", false, "show version")
+	showVersion := flags.Bool("version", false, "show version")
 	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
 	noInput := flags.Bool("no-input", false, "Do not require any input")
 	quiet := flags.Bool("quiet", false, "Disable all output (except for required input)")
-	disableColor := flags.Bool("no-color", false, "Disable colored output")
+	noColor := flags.Bool("no-color", false, "Disable colored output")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -83,11 +83,11 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 		retries:      *retries,
 		debug:        *debug,
 		help:         *help,
-		version:      *version,
+		version:      *showVersion,
 		dryRun:       *dry,
 		noInput:      *noInput,
 		quiet:        *quiet,
-		disableColor: *disableColor,
+		disableColor: *noColor,
 	}, nil
 }
 
