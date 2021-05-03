@@ -141,7 +141,6 @@ func newAwsConfig(args arguments) (aws.Config, error) {
 		options = append(options, config.WithEndpointResolver(resolver))
 	}
 
-	// TODO: handle error.
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
 	if err != nil {
 		return aws.Config{}, err
