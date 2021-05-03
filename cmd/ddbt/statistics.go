@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
+// statistics contains metrics about relevant to the process of truncating DynamoDB tables.
+//
+// This includes the total number of deleted items, the total number of used read capacity units (RCU) and total number
+// of used write capacity units.
 type statistics struct {
+	// mu is the mutex used to sync write operations to the statistics.
 	mu sync.Mutex
 	// deleted number of items
 	deleted uint64
@@ -17,24 +22,28 @@ type statistics struct {
 	wcu float64
 }
 
+// increaseDeleted adds the given number n of deleted items to the statistics.
 func (s *statistics) increaseDeleted(n uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.deleted += n
 }
 
+// addRCU adds the given number n of read capacity units to the statistics.
 func (s *statistics) addRCU(n float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.rcu += n
 }
 
+// addWCU adds the given number n of write capacity units to the statistics.
 func (s *statistics) addWCU(n float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.wcu += n
 }
 
+// printStatistics does print the given statistics as table to stdout.
 func printStatistics(stats *statistics, start time.Time) {
 	pterm.DefaultSection.Println("Statistics")
 

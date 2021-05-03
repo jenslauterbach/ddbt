@@ -47,8 +47,8 @@ func Test_disableColor(t *testing.T) {
 		{"option-false-TERM=test_NO_COLOR", args{disableColor: false, environment: []string{"NO_COLOR=true", "TERM=test"}}, true},
 		{"option-true-TERM=test_DDBT_NO_COLOR", args{disableColor: true, environment: []string{"DDBT_NO_COLOR=true", "TERM=test"}}, true},
 		{"option-false-TERM=test_DDBT_NO_COLOR", args{disableColor: false, environment: []string{"DDBT_NO_COLOR=true", "TERM=test"}}, true},
-		{"option-true-TERM=test_DDBT_NO_COLOR_NO_COLOR", args{disableColor: true, environment: []string{"NO_COLOR=true","DDBT_NO_COLOR=true", "TERM=test"}}, true},
-		{"option-false-TERM=test_DDBT_NO_COLOR_NO_COLOR", args{disableColor: false, environment: []string{"NO_COLOR=true","DDBT_NO_COLOR=true", "TERM=test"}}, true},
+		{"option-true-TERM=test_DDBT_NO_COLOR_NO_COLOR", args{disableColor: true, environment: []string{"NO_COLOR=true", "DDBT_NO_COLOR=true", "TERM=test"}}, true},
+		{"option-false-TERM=test_DDBT_NO_COLOR_NO_COLOR", args{disableColor: false, environment: []string{"NO_COLOR=true", "DDBT_NO_COLOR=true", "TERM=test"}}, true},
 
 		// environment variables with empty and no value
 		{"TERM=''", args{disableColor: false, environment: []string{"TERM="}}, false},

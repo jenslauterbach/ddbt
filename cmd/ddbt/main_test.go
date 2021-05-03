@@ -70,7 +70,7 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "unprocessed-items-1",
 			args: args{
-				items: createRandomItems(t,25),
+				items: createRandomItems(t, 25),
 				config: configuration{
 					db: &batchWriteItemMock{
 						output: []*dynamodb.BatchWriteItemOutput{
@@ -89,7 +89,7 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "unprocessed-items-2",
 			args: args{
-				items: createRandomItems(t,25),
+				items: createRandomItems(t, 25),
 				config: configuration{
 					db: &batchWriteItemMock{
 						output: []*dynamodb.BatchWriteItemOutput{
@@ -109,7 +109,7 @@ func Test_deleteBatch(t *testing.T) {
 		{
 			name: "delete-request-fails",
 			args: args{
-				items: createRandomItems(t,25),
+				items: createRandomItems(t, 25),
 				config: configuration{
 					db: &batchWriteItemMock{
 						output: nil,

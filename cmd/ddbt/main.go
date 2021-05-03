@@ -154,6 +154,11 @@ func run(ctx context.Context, args []string) error {
 	return nil
 }
 
+// askFormConfirmation does prompt the user for confirmation and returns either true, if the user does want to truncate
+// the table and false if not.
+//
+// The tableInfo is used by the prompt to display the tables ARN and approximate number of items in the table. If quiet
+// is set to true, the use will only be displayed the question and nothing more.
 func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableOutput, quiet bool) bool {
 	// Explicitly enable output before showing the question. The user might have used the --quiet flag. If that is the
 	// case the output would not be enabled, the question would not be shown.
@@ -182,6 +187,8 @@ func askForConfirmation(reader io.RuneReader, tableInfo *dynamodb.DescribeTableO
 	}
 }
 
+// retrieveTableInformation does fetch the tables information from the DynamoDB service or returns an error, if the
+// table can not be described.
 func retrieveTableInformation(ctx context.Context, config configuration) (*dynamodb.DescribeTableOutput, error) {
 	pterm.Debug.Printf("Retrieving table information for table %s\n", config.table)
 
@@ -199,11 +206,11 @@ func retrieveTableInformation(ctx context.Context, config configuration) (*dynam
 	return output, nil
 }
 
+// truncateTable does delete all items from the table.
+//
+// If any of the routines errs, the function will return an error. The function will return a nil-error, if the table
+// has been truncated successfully.
 func truncateTable(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput) error {
-	// The following code will create 'n' segments. Each segment will be run in its own Go routine, to allow parallel
-	// processing of those segments. Each segment itself will process a chunk of the table in so called pages. This
-	// will create some parallelism. To stop processing if an error occurs in any of the segments, a "errgroup" is used.
-	// An error in one Go routine will cancel all the other Go routines.
 	group, ctx := errgroup.WithContext(ctx)
 
 	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("Truncating table %s", *tableInfo.Table.TableArn))
@@ -232,6 +239,10 @@ func truncateTable(ctx context.Context, config configuration, tableInfo *dynamod
 	return nil
 }
 
+// processSegment does process a single segment of the total number of segments, deleting all the items associated with
+// this segment.
+//
+// If the segment is processed successfully, the function returns a nil error. Otherwise, a non-nil error is returned.
 func processSegment(ctx context.Context, config configuration, tableInfo *dynamodb.DescribeTableOutput, totalSegments int, segment int, g *errgroup.Group) error {
 	pterm.Debug.Printf("Start processing segment %d\n", segment)
 
@@ -270,9 +281,12 @@ func processSegment(ctx context.Context, config configuration, tableInfo *dynamo
 	return nil
 }
 
+// newProjection creates a new projection expression for the tables partition and hash key.
+//
+// The new expression will always contain at least the partition key. If the table uses a hash key, it will also be part
+// of the expression. If the expression is created successfully, the function returns the expression and a nil error. If
+// the expression can not be created, the function returns a nil expression and a non-nil error.
 func newProjection(keys []types.KeySchemaElement) (*expression.Expression, error) {
-	// There is at least one key in the table. This one will be added by default. If there is a second key, it is added
-	// to the projection as well.
 	projection := expression.NamesList(expression.Name(*keys[0].AttributeName))
 
 	if len(keys) == 2 {
@@ -287,10 +301,14 @@ func newProjection(keys []types.KeySchemaElement) (*expression.Expression, error
 	return &expr, nil
 }
 
+// processPage does process the items of the given page, deleting the items in batches.
+//
+// The given page might contain more items than the maxBatchSize, resulting in more than one request to DynamoDB. If the
+// page is processed successfully, the function will return a nil error. Otherwise, a non-nil error is returned.
 func processPage(ctx context.Context, config configuration, page *dynamodb.ScanOutput) error {
 	var total = page.Count
-	var from int32
-	var to int32
+	var from, to int32
+
 	for from = 0; from < total; from += maxBatchSize {
 		to += maxBatchSize
 		if to > total {
@@ -306,6 +324,10 @@ func processPage(ctx context.Context, config configuration, page *dynamodb.ScanO
 	return nil
 }
 
+// deleteBatch does delete the given batch of items from the table.
+//
+// The function will update the metrics of the given configuration. If all items have been deleted successfully, the
+// function will return a nil error, otherwise a non-nil error is returned.
 func deleteBatch(ctx context.Context, config configuration, items []map[string]types.AttributeValue) error {
 	batchSize := uint64(len(items))
 	var processed uint64
