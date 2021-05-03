@@ -14,23 +14,40 @@ import (
 	"strings"
 )
 
+// arguments stores the command line options and arguments the user provides when invoking the program.
 type arguments struct {
-	region   string
-	profile  string
+	// region is the AWS region the DynamoDB table is in (--region).
+	region string
+	// profile is the AWS profile to use when determining the users credentials (--profile).
+	profile string
+	// endpoint is the DynamoDB endpoint to which API calls are send to (--endpoint-url).
 	endpoint string
-	table    string
-	retries  int
-	debug    bool
-	help     bool
-	version  bool
-	dryRun   bool
-	noInput  bool
-	quiet    bool
-	// disableColor indicates whether or not the programs should be colored or not. If set to 'true', the output will
-	// not be colored. If set to 'false' (the default), output can use colors.
+	// table is the name of the DynamoDB table to truncate.
+	table string
+	// retries is the number of retries the underlying HTTP client should do, if a request fails. The default is set
+	// by defaultMaxRetries and can be overwritten with --max-retries.
+	retries int
+	// debug indicates whether or not the program should show debugging output (--debug).
+	debug bool
+	// help indicates whether or not the program should show the help/usage (--help).
+	help bool
+	// version indicates whether or not the program should show the version number (--version).
+	version bool
+	// dryRun indicates whether or not the program should perform a dry run (--dry-run).
+	dryRun bool
+	// noInput indicates whether or not the user should be asked for any input or not (--no-input).
+	noInput bool
+	// quiet indicates whether or not the program should show any output (--quiet).
+	quiet bool
+	// disableColor indicates whether or not the programs output should be colored or not. If set to 'true', the output
+	// will not be colored. If set to 'false' (the default), output is colored. Set by the --no-color flag.
 	disableColor bool
 }
 
+// parseArguments does parse the given flag set and command line args.
+//
+// If the parsing is successful, the function returns the arguments and a nil error. Otherwise, the function returns a
+// non-nil error and "empty" arguments.
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	region := flags.String("region", "", "AWS region to use")
 	profile := flags.String("profile", "", "AWS profile to use")
@@ -74,14 +91,15 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	}, nil
 }
 
+// configuration contains the most important settings relevant to the programs function.
 type configuration struct {
-	// table is the name of the DynamoDB table to be truncated
+	// table is the name of the DynamoDB table to be truncated.
 	table string
-	// db is the client used to interact with DynamoDB
+	// db is the client used to interact with DynamoDB.
 	db DynamoDBAPI
-	// log is used to output debug information
+	// logger is used to output debug information.
 	logger *log.Logger
-	// dryRun allows running the program without actually deleting items from DynamoDB
+	// dryRun allows running the program without actually deleting items from DynamoDB.
 	dryRun bool
 	// stats keeps track of deleted of important statistics related to the process of truncating the table, like number
 	// of deleted or failed items or how much capacity was consumed.
@@ -89,7 +107,7 @@ type configuration struct {
 }
 
 // newAwsConfig returns a AWS configuration based on the options the user selected on the command line.
-func newAwsConfig(args arguments) aws.Config {
+func newAwsConfig(args arguments) (aws.Config, error) {
 	// The options array will be updated within this function based on the provided command line arguments. At the end
 	// the array will be passed to 'LoadDefaultConfig()' to create a AWS configuration for the DynamoDB client that
 	// reflects the options the user has selected on the command line.
@@ -124,13 +142,23 @@ func newAwsConfig(args arguments) aws.Config {
 	}
 
 	// TODO: handle error.
-	cfg, _ := config.LoadDefaultConfig(context.TODO(), options...)
+	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
+	if err != nil {
+		return aws.Config{}, err
+	}
 
-	return cfg
+	return cfg, nil
 }
 
+// newConfig creates a new configuration from the given arguments.
+//
+// If the configuration is created successfully the function will return the configuration and a nil error. Otherwise,
+// the function returns a non-nil error and an empty configuration.
 func newConfig(args arguments) (configuration, error) {
-	awsConfig := newAwsConfig(args)
+	awsConfig, err := newAwsConfig(args)
+	if err != nil {
+		return configuration{}, err
+	}
 
 	return configuration{
 		table:  args.table,
