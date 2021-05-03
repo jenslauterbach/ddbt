@@ -42,6 +42,18 @@ brew tap jenslauterbach/ddbt
 brew install ddbt
 ```
 
+### Building From Source
+
+To build from source you need to install [Go](https://golang.org) first.
+
+```shell
+git clone https://github.com/jenslauterbach/ddbt.git
+cd ddbt
+go build ./cmd/ddbt
+```
+
+The build will create a new binary called `ddbt`.
+
 ## Configuration
 [(Back to top)](#table-of-contents)
 
