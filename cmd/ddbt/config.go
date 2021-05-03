@@ -172,7 +172,7 @@ func isInputFromPipe() bool {
 	return fileInfo.Mode()&os.ModeCharDevice == 0
 }
 
-// The following constants are used for reading environments variable to find out if color should be used for output.
+// The following constants are used for reading environment variables to find out if color should be used for output.
 const (
 	// envVariableSeparator is the separator used to split environment variables strings returned by os.Environ()
 	envVariableSeparator = "="
