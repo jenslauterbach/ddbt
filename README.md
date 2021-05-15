@@ -1,4 +1,4 @@
-# ddbt (DynamoDB Truncate)
+# DynamoDB Truncate (ddbt)
 
 > Disclaimer: This tool is in early development. It is *not* recommended to use this tool in production. There is the risk of data loss.
 
@@ -15,6 +15,7 @@
 - [Installation](#installation)
   - [Download from Github](#download-from-github)
   - [Using Homebrew](#using-homebrew)
+  - [Building From Source](#building-from-source)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Quick Start](#quick-start)
