@@ -80,7 +80,7 @@ func main() {
 	}()
 
 	flag.CommandLine.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), usage)
+		fmt.Fprint(flag.CommandLine.Output(), usage)
 	}
 
 	err := run(ctx, os.Args[1:])
