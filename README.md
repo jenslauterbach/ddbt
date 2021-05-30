@@ -20,7 +20,6 @@
 - [Usage](#usage)
 - [Quick Start](#quick-start)
 - [Permissions](#permissions)
-- [Flags and Arguments](#flags-and-arguments)
 - [AWS Cost](#aws-cost)
 - [Design Goals](#design-goals)
 - [Versioning](#versioning)
@@ -66,27 +65,27 @@ The build will create a new binary called `ddbt`.
 To truncate a DynamoDB table the only required _argument_ is the name of the table. Everything else can be controlled through options (also called flags):
 
 ````shell script
-ddbt [options...] <table-name>
+Usage: ddbt [options...] <table-name>
+
+Options:
+    -d, --debug                 Show debug information
+        --dry-run               Simulate truncating table
+        --endpoint-url <url>    Custom endpoint url (overwrite default endpoint)
+    -h, --help                  This help text
+        --max-retries <retries> Maximum number of retries (default: 3)
+        --no-input              Do not require any input
+        --no-color              Disable colored output
+    -p, --profile <profile>     AWS profile to use
+    -q, --quiet                 Disable all output (except for required input)
+    -r, --region <region>       AWS region of DynamoDB table (overwrite default region)
+        --version               Show version number and quit
+
+Examples:
+
+    $ ddbt TestTable
+    $ ddbt --region eu-central-1 TestTable
+    $ ddbt --region localhost --endpoint-url http://localhost:8000 TestTable
 ````
-
-See chapter [Flags and Arguments](#flags-and-arguments) for an overview of all available flags.
-
-## Flags and Arguments
-[(Back to top)](#table-of-contents)
-
-| Option | Description |
-|:---|:---|
-|--debug|Show debug information|
-|--dry-run|Simulate truncating table|
-|--endpoint-url|Custom endpoint url (overwrite default endpoint)|
-|--help|Show help text|
-|--max-retries|Maximum number of retries (default: 3)|
-|--no-input|Do not require any input|
-|--no-color|Disable colored output|
-|--profile|AWS profile to use|
-|--quiet|Disable all output (except for required input)|
-|--region|AWS region of DynamoDB table (overwrite default region)|
-|--version|Show version number and quit|
 
 ## Quick Start
 [(Back to top)](#table-of-contents)

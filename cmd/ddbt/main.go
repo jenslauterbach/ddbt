@@ -40,7 +40,7 @@ Options:
     -d, --debug                 Show debug information
         --dry-run               Simulate truncating table
         --endpoint-url <url>    Custom endpoint url (overwrite default endpoint)
-    -h, --help                  This help text
+    -h, --help                  Show this help text
         --max-retries <retries> Maximum number of retries (default: 3)
         --no-input              Do not require any input
         --no-color              Disable colored output
@@ -48,6 +48,12 @@ Options:
     -q, --quiet                 Disable all output (except for required input)
     -r, --region <region>       AWS region of DynamoDB table (overwrite default region)
         --version               Show version number and quit
+
+Examples:
+
+    $ ddbt TestTable
+    $ ddbt --region eu-central-1 TestTable
+    $ ddbt --region localhost --endpoint-url http://localhost:8000 TestTable
 `
 )
 
