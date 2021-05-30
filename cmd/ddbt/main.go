@@ -37,17 +37,17 @@ const (
 	usage = `Usage: ddbt [options...] <table-name>
 
 Options:
-  --debug		Show debug information
-  --dry-run		Simulate truncating table
-  --endpoint-url	Custom endpoint url (overwrite default endpoint)
-  --help		This help text
-  --max-retries		Maximum number of retries (default: 3)
-  --no-input		Do not require any input
-  --no-color		Disable colored output
-  --profile		AWS profile to use
-  --quiet		Disable all output (except for required input)
-  --region		AWS region of DynamoDB table (overwrite default region)
-  --version		Show version number and quit
+    -d, --debug                 Show debug information
+        --dry-run               Simulate truncating table
+        --endpoint-url <url>    Custom endpoint url (overwrite default endpoint)
+    -h, --help                  This help text
+        --max-retries <retries> Maximum number of retries (default: 3)
+        --no-input              Do not require any input
+        --no-color              Disable colored output
+    -p, --profile <profile>     AWS profile to use
+    -q, --quiet                 Disable all output (except for required input)
+    -r, --region <region>       AWS region of DynamoDB table (overwrite default region)
+        --version               Show version number and quit
 `
 )
 
@@ -78,6 +78,10 @@ func main() {
 		case <-ctx.Done():
 		}
 	}()
+
+	flag.CommandLine.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), usage)
+	}
 
 	err := run(ctx, os.Args[1:])
 	if err != nil {

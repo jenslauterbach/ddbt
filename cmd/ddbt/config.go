@@ -49,17 +49,28 @@ type arguments struct {
 // If the parsing is successful, the function returns the arguments and a nil error. Otherwise, the function returns a
 // non-nil error and "empty" arguments.
 func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
-	region := flags.String("region", "", "AWS region to use")
-	profile := flags.String("profile", "", "AWS profile to use")
-	endpoint := flags.String("endpoint-url", "", "url of the DynamoDB endpoint to use")
-	retries := flags.Int("max-retries", defaultMaxRetries, fmt.Sprintf("maximum number of retries (default: %d)", defaultMaxRetries))
-	debug := flags.Bool("debug", false, "show debug information")
-	help := flags.Bool("help", false, "show help text")
-	showVersion := flags.Bool("version", false, "show version")
-	dry := flags.Bool("dry-run", false, "run command without actually deleting items")
-	noInput := flags.Bool("no-input", false, "Do not require any input")
-	quiet := flags.Bool("quiet", false, "Disable all output (except for required input)")
-	noColor := flags.Bool("no-color", false, "Disable colored output")
+	var (
+		region, profile, endpoint                              string
+		retries                                                int
+		debug, help, showVersion, dry, noInput, quiet, noColor bool
+	)
+
+	flags.StringVar(&region, "region", "", "AWS region to use")
+	flags.StringVar(&region, "r", "", "AWS region to use")
+	flags.StringVar(&profile, "profile", "", "AWS profile to use")
+	flags.StringVar(&profile, "p", "", "AWS profile to use")
+	flags.StringVar(&endpoint, "endpoint-url", "", "url of the DynamoDB endpoint to use")
+	flags.IntVar(&retries, "max-retries", defaultMaxRetries, fmt.Sprintf("maximum number of retries (default: %d)", defaultMaxRetries))
+	flags.BoolVar(&debug, "debug", false, "show debug information")
+	flags.BoolVar(&debug, "d", false, "show debug information")
+	flags.BoolVar(&help, "help", false, "show help text")
+	flags.BoolVar(&help, "h", false, "show help text")
+	flags.BoolVar(&showVersion, "version", false, "show version")
+	flags.BoolVar(&dry, "dry-run", false, "run command without actually deleting items")
+	flags.BoolVar(&noInput, "no-input", false, "Do not require any input")
+	flags.BoolVar(&quiet, "quiet", false, "Disable all output (except for required input)")
+	flags.BoolVar(&quiet, "q", false, "Disable all output (except for required input)")
+	flags.BoolVar(&noColor, "no-color", false, "Disable colored output")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -76,18 +87,18 @@ func parseArguments(flags *flag.FlagSet, args []string) (arguments, error) {
 	}
 
 	return arguments{
-		region:       *region,
-		profile:      *profile,
-		endpoint:     *endpoint,
+		region:       region,
+		profile:      profile,
+		endpoint:     endpoint,
 		table:        table,
-		retries:      *retries,
-		debug:        *debug,
-		help:         *help,
-		version:      *showVersion,
-		dryRun:       *dry,
-		noInput:      *noInput,
-		quiet:        *quiet,
-		disableColor: *noColor,
+		retries:      retries,
+		debug:        debug,
+		help:         help,
+		version:      showVersion,
+		dryRun:       dry,
+		noInput:      noInput,
+		quiet:        quiet,
+		disableColor: noColor,
 	}, nil
 }
 
@@ -204,9 +215,9 @@ const (
 //
 // Besides the command line option '--no-color' the following environment variables are considered:
 //
-// 	1. NO_COLOR (any value)
+//  1. NO_COLOR (any value)
 //  2. DDBT_NO_COLOR (any value)
-//	3. TERM (if set to 'dumb')
+//  3. TERM (if set to 'dumb')
 //
 // If any of those environment has the expected value, ths function will return 'true'. Only if none of those
 // environment variables exist or are set to the appropriate value and the command line option '--no-color' is set to
