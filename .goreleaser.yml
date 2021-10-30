@@ -8,7 +8,7 @@ builds:
   -
     dir: cmd/ddbt
     ldflags:
-      - -s -w
+      - -s -w -X main.version={{.Version}} -X main.date={{ time "02.01.2006" }}
     env:
       - CGO_ENABLED=0
     goos:
