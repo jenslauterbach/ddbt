@@ -1,4 +1,4 @@
-module ddbt
+module github.com/jenslauterbach/ddbt
 
 go 1.16
 

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"ddbt/internal"
+	"github.com/jenslauterbach/ddbt/internal"
 	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
