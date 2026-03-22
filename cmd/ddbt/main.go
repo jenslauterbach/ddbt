@@ -7,16 +7,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/pterm/pterm"
 	"golang.org/x/sync/errgroup"
-	"io"
-	"os"
-	"os/signal"
-	"time"
 )
 
 const (

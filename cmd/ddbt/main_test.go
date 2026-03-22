@@ -3,14 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/jenslauterbach/ddbt/internal"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"io/ioutil"
 	"log"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/jenslauterbach/ddbt/internal"
 )
 
 const (

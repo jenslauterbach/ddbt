@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/pterm/pterm"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/pterm/pterm"
 )
 
 // statistics contains metrics about relevant to the process of truncating DynamoDB tables.
